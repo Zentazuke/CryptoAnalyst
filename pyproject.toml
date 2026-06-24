@@ -1,0 +1,24 @@
+[project]
+name = "crypto-analyst"
+version = "0.1.0"
+description = "A standalone, verifiable crypto analytics tool (analyst-first)."
+requires-python = ">=3.11"
+dependencies = [
+    "httpx>=0.28",
+    "duckdb>=1.5",
+    "pydantic>=2.10",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
+    "tenacity>=9.0",
+]
+
+[dependency-groups]
+dev = ["pytest>=8.0"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.setuptools.packages.find]
+include = ["analyst*"]
