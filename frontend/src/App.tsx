@@ -69,8 +69,9 @@ export default function App() {
         <div className="status error">
           <p>Could not load data: {error}</p>
           <p className="footnote">
-            Is the analyst API running at <code>{API_BASE}</code>? Start it with{" "}
-            <code>uvicorn analyst.api.app:app</code> and ingest data for this symbol/timeframe.
+            The page calls <code>{API_BASE}</code>, proxied to the analyst API on port 8000.
+            Easiest fix: close everything and run <code>run-analyst.bat</code> — it starts the API +
+            visualizer and ingests data for you.
           </p>
         </div>
       )}

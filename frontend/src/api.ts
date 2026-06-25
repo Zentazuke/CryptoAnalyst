@@ -1,8 +1,8 @@
 import type { ChartResponse, MicroSnapshot } from "./types";
 
-// Use 127.0.0.1 (not "localhost"): on Windows "localhost" can resolve to IPv6
-// ::1, but uvicorn binds IPv4 127.0.0.1 — the mismatch causes "Failed to fetch".
-const BASE = import.meta.env.VITE_API_BASE ?? "http://127.0.0.1:8000";
+// Same-origin: the dev server proxies "/api" -> the analyst API (see
+// vite.config.ts). This sidesteps browser CORS and IPv4/IPv6 loopback issues.
+const BASE = import.meta.env.VITE_API_BASE ?? "/api";
 
 async function getJSON<T>(path: string): Promise<T> {
   const resp = await fetch(`${BASE}${path}`);
