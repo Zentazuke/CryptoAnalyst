@@ -175,6 +175,44 @@ class CryptoComSource:
         asks = [[float(p), float(s)] for p, s, *_ in data.get("asks", [])]
         return {"bids": bids, "asks": asks, "t": int(data["t"])}, raw
 
+    def fetch_funding_history(
+        self, perp: str, total: int, page: int = 300, pause: float = 0.12
+    ) -> tuple[list[dict], list[dict]]:
+        """Hourly funding-rate history for a perpetual, paged ``end_ts`` backwards.
+
+        Returns ``([{t, v}, ...] ascending, raw_pages)``."""
+        collected: dict[int, float] = {}
+        raws: list[dict] = []
+        end_ts: int | None = None
+        max_pages = total // page + 6
+
+        for _ in range(max_pages):
+            if len(collected) >= total:
+                break
+            params: dict = {"instrument_name": perp, "valuation_type": "funding_hist", "count": page}
+            if end_ts is not None:
+                params["end_ts"] = end_ts
+            raw = self._get("/public/get-valuations", params)
+            if raw.get("code") not in (0, "0"):
+                raise CryptoComError(f"funding API error {perp}: code={raw.get('code')}")
+            data = (raw.get("result") or {}).get("data") or []
+            if not data:
+                break
+            raws.append(raw)
+            pts = [(int(x["t"]), float(x["v"])) for x in data]
+            new = sum(1 for t, _ in pts if t not in collected)
+            for t, v in pts:
+                collected.setdefault(t, v)
+            oldest = min(t for t, _ in pts)
+            next_end = oldest - 1
+            if new == 0 or (end_ts is not None and next_end >= end_ts):
+                break
+            end_ts = next_end
+            time.sleep(pause)
+
+        rows = [{"t": t, "v": v} for t, v in sorted(collected.items())]
+        return (rows[-total:] if len(rows) > total else rows), raws
+
     def fetch_ticker(self, symbol: str) -> tuple[dict, dict]:
         """Ticker snapshot. Returns (parsed, raw) with best bid/ask, last,
         volume, and open interest (``oi``; ``None`` for spot)."""

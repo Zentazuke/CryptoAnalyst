@@ -25,12 +25,21 @@ def _candles(n=900, seed=11):
 
 
 def test_build_dataset_shapes_and_labels():
-    X, y, idx = M.build_dataset(_candles(), horizon=12, k=1.0)
+    X, y, idx, names = M.build_dataset(_candles(), horizon=12, k=1.0)
     assert X.shape[0] == len(y) == len(idx)
-    assert X.shape[1] == len(M.MODEL_FEATURES)
+    assert X.shape[1] == len(M.MODEL_FEATURES) == len(names)
     assert np.all(np.isfinite(X))
     assert set(np.unique(y)).issubset(set(M.CLASSES))
     assert np.all(np.diff(idx) >= 0)  # chronological
+
+
+def test_build_dataset_with_extra_features():
+    candles = _candles()
+    n = len(candles)
+    extra = {"funding_rate": np.linspace(-0.01, 0.01, n), "funding_rank": np.full(n, 0.5)}
+    X, y, idx, names = M.build_dataset(candles, horizon=12, k=1.0, extra_features=extra)
+    assert X.shape[1] == len(M.MODEL_FEATURES) + 2
+    assert names[-2:] == ["funding_rate", "funding_rank"]
 
 
 def test_walk_forward_eval_structure():

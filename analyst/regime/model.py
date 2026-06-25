@@ -55,11 +55,28 @@ def _feature_matrix(feats: dict[str, np.ndarray]) -> np.ndarray:
 
 
 def build_dataset(
-    candles: list[Any], horizon: int = 24, k: float = 1.0, params: dict | None = None
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Return (X, y, idx): feature rows, class labels, and source bar indices."""
+    candles: list[Any], horizon: int = 24, k: float = 1.0, params: dict | None = None,
+    extra_features: dict[str, np.ndarray] | None = None,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, list[str]]:
+    """Return (X, y, idx, feature_names).
+
+    ``extra_features`` maps name -> array aligned to ``candles`` (e.g. funding
+    features); rows with any non-finite feature are dropped, so adding an extra
+    feature that is NaN early simply trims the warmup.
+    """
     feats = compute_regime_features(candles, params)
-    X_all = _feature_matrix(feats)
+    base = _feature_matrix(feats)
+    names = list(MODEL_FEATURES)
+
+    if extra_features:
+        extra_cols = []
+        for name, arr in extra_features.items():
+            names.append(name)
+            extra_cols.append(np.asarray(arr, dtype=float).reshape(-1, 1))
+        X_all = np.column_stack([base, *extra_cols])
+    else:
+        X_all = base
+
     close, atr_pct = feats["close"], feats["atr_pct"]
     n = len(close)
     sqrt_h = math.sqrt(horizon)
@@ -73,7 +90,7 @@ def build_dataset(
         ys.append("up" if scaled > k else "down" if scaled < -k else "range")
         rows.append(x)
         idxs.append(i)
-    return np.array(rows, dtype=float), np.array(ys), np.array(idxs, dtype=int)
+    return np.array(rows, dtype=float), np.array(ys), np.array(idxs, dtype=int), names
 
 
 def _rule_class(label: str) -> str:
@@ -86,10 +103,10 @@ def _rule_class(label: str) -> str:
 
 def walk_forward_eval(
     candles: list[Any], horizon: int = 24, k: float = 1.0, n_splits: int = 5,
-    params: dict | None = None,
+    params: dict | None = None, extra_features: dict[str, np.ndarray] | None = None,
 ) -> dict:
     """Out-of-sample model-vs-rules comparison via TimeSeriesSplit."""
-    X, y, idx = build_dataset(candles, horizon, k, params)
+    X, y, idx, names = build_dataset(candles, horizon, k, params, extra_features)
     if len(y) < 250:
         raise ValueError(f"not enough samples ({len(y)}) for {n_splits}-fold walk-forward")
 
@@ -114,6 +131,7 @@ def walk_forward_eval(
 
     return {
         "horizon": horizon, "k": k, "n_splits": n_splits, "oos_samples": len(ml_true),
+        "n_features": len(names), "features": names,
         "class_balance": {c: int((ml_true == c).sum()) for c in CLASSES},
         "ml_balanced_acc": round(balanced_accuracy_score(ml_true, ml_pred), 4),
         "rule_balanced_acc": round(balanced_accuracy_score(ml_true, rule_pred), 4),
@@ -124,15 +142,21 @@ def walk_forward_eval(
 
 
 def train_and_predict_latest(
-    candles: list[Any], horizon: int = 24, k: float = 1.0, params: dict | None = None
+    candles: list[Any], horizon: int = 24, k: float = 1.0, params: dict | None = None,
+    extra_features: dict[str, np.ndarray] | None = None,
 ) -> dict | None:
     """Train on all labelled rows and return class probabilities for the last bar."""
-    X, y, _ = build_dataset(candles, horizon, k, params)
+    X, y, _, _ = build_dataset(candles, horizon, k, params, extra_features)
     if len(y) < 250:
         return None
     clf = _new_model()
     clf.fit(X, y)
-    x_last = _feature_matrix(compute_regime_features(candles, params))[-1]
+    base_last = _feature_matrix(compute_regime_features(candles, params))[-1]
+    if extra_features:
+        extra_last = [np.asarray(a, dtype=float)[-1] for a in extra_features.values()]
+        x_last = np.concatenate([base_last, extra_last])
+    else:
+        x_last = base_last
     if not np.all(np.isfinite(x_last)):
         return None
     proba = clf.predict_proba(x_last.reshape(1, -1))[0]

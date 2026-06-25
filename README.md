@@ -72,7 +72,14 @@ data/          duckdb file + raw/ archive (gitignored)
   range/trend/breakout/flash/low-vol calls with confidence + reasons, plus a
   calibration harness that backtests calls vs forward outcomes (hit-rate, base
   rate, lift). Trend labels show lift > 1 on live BTC/ETH 1h.
-- [ ] A4 Dashboards + alerts (regime ribbon, combo-alerts)
+- [x] **Accuracy study** — deep history (pagination), walk-forward threshold
+  tuning, a trees-first ML benchmark, and a funding-feature A/B. Honest finding:
+  short-horizon single-asset *direction* is near the predictability floor; the
+  transparent rule classifier wins OOS and neither ML nor funding features beat
+  it. Funding is kept as a **risk-context** signal, not a directional predictor.
+  Funding history via `python -m analyst.collect_funding`.
+- [ ] A4 Dashboards + alerts (regime ribbon, combo-alerts combining regime +
+  funding/spread risk context)
 - [ ] A5 On-chain · A6 Sentiment/options · A7 Research workbench
 
 ### Indicator conventions

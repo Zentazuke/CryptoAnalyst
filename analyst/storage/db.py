@@ -75,6 +75,15 @@ CREATE TABLE IF NOT EXISTS microstructure (
     ingest_ts        BIGINT,
     PRIMARY KEY (symbol, ts)
 );
+
+CREATE TABLE IF NOT EXISTS funding_history (
+    symbol        VARCHAR,
+    ts            BIGINT,
+    funding_rate  DOUBLE,
+    source        VARCHAR,
+    ingest_ts     BIGINT,
+    PRIMARY KEY (symbol, ts)
+);
 """
 
 
@@ -187,7 +196,32 @@ class Store:
             ],
         )
 
+    def upsert_funding(self, symbol: str, rows: list[dict], source: str) -> int:
+        """Insert/update funding history rows ({t, v}); idempotent on (symbol, ts)."""
+        if not rows:
+            return 0
+        ingest_ts = now_ms()
+        params = [(symbol, int(r["t"]), float(r["v"]), source, ingest_ts) for r in rows]
+        self.conn.executemany(
+            """
+            INSERT INTO funding_history (symbol, ts, funding_rate, source, ingest_ts)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT (symbol, ts) DO UPDATE SET
+                funding_rate = EXCLUDED.funding_rate,
+                source = EXCLUDED.source, ingest_ts = EXCLUDED.ingest_ts
+            """,
+            params,
+        )
+        return len(params)
+
     # ---- reads ------------------------------------------------------------
+
+    def get_funding(self, symbol: str) -> list[dict]:
+        cur = self.conn.execute(
+            "SELECT ts, funding_rate FROM funding_history WHERE symbol = ? ORDER BY ts",
+            [symbol],
+        )
+        return [{"t": r[0], "v": r[1]} for r in cur.fetchall()]
 
     def get_micro(self, symbol: str, limit: int = 1) -> list[dict]:
         """Most recent microstructure snapshots for a symbol (newest first)."""
