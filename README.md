@@ -19,6 +19,13 @@ history, open interest). Switch with `ANALYST_EXCHANGE=cryptocom` (or `binance`)
 Internal symbols use `BASE_QUOTE` (e.g. `BTC_USDT`); adapters translate per venue.
 Market data is public — the Binance testnet key in `.env` is only for the bot.
 
+### Run everything (one click)
+
+Double-click **`run-all.bat`** — frees ports, ingests data, and launches the
+analyst API + visualizer **and** the sentiment engine (API + live feeds), then
+opens the dashboard. The analyst runs fine on its own (`run-analyst.bat`) if the
+sentiment engine isn't set up. Close the terminal windows to stop everything.
+
 ### Setup
 
 ```powershell
