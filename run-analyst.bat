@@ -33,6 +33,11 @@ if not exist "%~dp0frontend\node_modules" (
   echo.
 )
 
+REM --- release ports from any previous run (also frees the DB lock) ---------
+echo [ports] Releasing %API_PORT% / %WEB_PORT% if held by a previous run...
+powershell -NoProfile -Command "Get-NetTCPConnection -State Listen -LocalPort %API_PORT%,%WEB_PORT% -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }"
+echo.
+
 REM --- refresh data (best-effort; harmless if offline) ----------------------
 echo [data] Refreshing BTC/ETH 1h candles ^(best-effort^)...
 "%PY%" -m analyst.ingest --symbols BTC_USDT,ETH_USDT --timeframe 1h --count 300
