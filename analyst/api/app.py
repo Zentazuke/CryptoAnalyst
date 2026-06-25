@@ -21,6 +21,7 @@ from analyst.config import DB_PATH, DEFAULT_TIMEFRAME
 from analyst.features import compute_indicators, snapshot
 from analyst.features.engine import INDICATOR_VERSION
 from analyst.regime import calibrate, classify_latest, classify_series
+from analyst.regime.derivatives import align_funding
 from analyst.storage import Store
 from analyst.utils import ms_to_iso, now_ms
 
@@ -214,8 +215,21 @@ def chart(
     }
     panels = {
         name: _line(times, series[name])
-        for name in ("rsi_14", "macd", "macd_signal", "macd_hist", "atr_14", "adx_14")
+        for name in (
+            "rsi_14", "macd", "macd_signal", "macd_hist",
+            "atr_14", "adx_14", "plus_di", "minus_di",
+        )
     }
+
+    # aligned funding series (causal forward-fill), if funding history exists
+    funding_rows = store().get_funding(symbol)
+    if funding_rows:
+        aligned = align_funding([r["ts"] for r in rows], funding_rows)
+        panels["funding"] = [
+            {"time": t, "value": float(v)}
+            for t, v in zip(times, aligned)
+            if math.isfinite(v)
+        ]
 
     checks = store().quality(symbol, limit=1)
     quality = checks[0] if checks else None
@@ -225,6 +239,11 @@ def chart(
         {"time": t, "label": r.label, "confidence": r.confidence}
         for t, r in zip(times, regime_results)
     ]
+    # attach the current regime's historical reliability (calibration lift)
+    regime_current = regime_results[-1].model_dump()
+    cal = calibrate(rows, regime_results)
+    regime_current["calibration"] = cal["per_label"].get(regime_current["label"])
+    regime_current["calibration_horizon"] = cal["horizon"]
 
     return {
         "symbol": symbol,
@@ -238,6 +257,6 @@ def chart(
         "overlays": overlays,
         "panels": panels,
         "regime": regime_series,
-        "regime_current": regime_results[-1].model_dump(),
+        "regime_current": regime_current,
         "quality": quality,
     }

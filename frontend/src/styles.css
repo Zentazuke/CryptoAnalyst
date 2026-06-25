@@ -129,3 +129,57 @@ header.app-head {
 .status.error { color: var(--bad); }
 
 .footnote { color: var(--muted); font-size: 12px; margin-top: 8px; }
+
+/* Summary cards */
+.cards-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+@media (max-width: 860px) { .cards-row { grid-template-columns: 1fr; } }
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+.card-title {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+}
+
+.muted-txt { color: var(--muted); }
+.good-txt { color: var(--good); }
+.bad-txt { color: var(--bad); }
+
+/* Regime card */
+.regime-headline { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.regime-chip { width: 14px; height: 14px; border-radius: 4px; }
+.regime-name { font-size: 22px; font-weight: 700; }
+
+.conf-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.conf-label { color: var(--muted); font-size: 12px; width: 70px; }
+.conf-track { flex: 1; height: 8px; background: var(--border); border-radius: 999px; overflow: hidden; }
+.conf-fill { height: 100%; border-radius: 999px; }
+.conf-val { font-variant-numeric: tabular-nums; font-size: 13px; width: 36px; text-align: right; }
+
+.reasons { margin: 0 0 12px; padding-left: 18px; color: var(--text); font-size: 13px; }
+.reasons li { margin: 2px 0; }
+
+.calibration { border-top: 1px solid var(--border); padding-top: 10px; font-size: 12.5px; line-height: 1.5; }
+.cal-title { display: block; color: var(--muted); text-transform: uppercase; font-size: 11px; letter-spacing: 0.4px; margin-bottom: 4px; }
+
+/* Microstructure stat grid */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+}
+.stat { display: flex; flex-direction: column; gap: 3px; }
+.stat-k { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; }
+.stat-v { font-size: 16px; font-variant-numeric: tabular-nums; }
