@@ -33,8 +33,17 @@ def ingest_symbol(
     source: DataSource,
     raw_dir: Path = RAW_DIR,
 ) -> tuple[IngestResult, GapReport]:
-    """Run the full pipeline for one symbol and return (provenance, gap report)."""
-    candles, raw = source.fetch_ohlcv(symbol, timeframe, count)
+    """Run the full pipeline for one symbol and return (provenance, gap report).
+
+    Counts above ~300 paginate backwards (the API caps a single request), when
+    the source supports it.
+    """
+    history = getattr(source, "fetch_ohlcv_history", None)
+    if count > 300 and callable(history):
+        candles, raws = history(symbol, timeframe, count)
+        raw: dict = {"pages": raws}
+    else:
+        candles, raw = source.fetch_ohlcv(symbol, timeframe, count)
     raw_path = archive_raw(raw, source.name, symbol, timeframe, raw_dir)
     rows = store.upsert_candles(candles)
 

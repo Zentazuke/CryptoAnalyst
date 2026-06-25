@@ -14,6 +14,8 @@ Uses the unauthenticated market-data endpoints. Candlestick response shape
 """
 from __future__ import annotations
 
+import time
+
 import httpx
 from tenacity import (
     retry,
@@ -82,8 +84,12 @@ class CryptoComSource:
 
         result = raw.get("result") or {}
         rows = result.get("data") or []
-        ingest_ts = now_ms()
+        candles = self._parse_candles(symbol, timeframe, rows, now_ms())
+        return candles, raw
 
+    def _parse_candles(
+        self, symbol: str, timeframe: str, rows: list[dict], ingest_ts: int
+    ) -> list[Candle]:
         candles = [
             Candle(
                 symbol=symbol,
@@ -100,7 +106,55 @@ class CryptoComSource:
             for row in rows
         ]
         candles.sort(key=lambda c: c.ts)
-        return candles, raw
+        return candles
+
+    def fetch_ohlcv_history(
+        self,
+        symbol: str,
+        timeframe: str,
+        total: int,
+        page: int = 300,
+        pause: float = 0.12,
+    ) -> tuple[list[Candle], list[dict]]:
+        """Fetch up to ``total`` candles by paging ``end_ts`` backwards.
+
+        The API caps a single request at ~300 candles, so we walk backwards
+        from the most recent bar. Returns ``(candles_ascending, raw_pages)``;
+        de-duplicates on timestamp and stops at the start of available history.
+        """
+        collected: dict[int, Candle] = {}
+        raws: list[dict] = []
+        end_ts: int | None = None
+        max_pages = total // page + 6
+
+        for _ in range(max_pages):
+            if len(collected) >= total:
+                break
+            params: dict = {"instrument_name": symbol, "timeframe": timeframe, "count": page}
+            if end_ts is not None:
+                params["end_ts"] = end_ts
+            raw = self._get("/public/get-candlestick", params)
+            if raw.get("code") not in (0, "0"):
+                raise CryptoComError(f"API error for {symbol}/{timeframe}: code={raw.get('code')}")
+            rows = (raw.get("result") or {}).get("data") or []
+            if not rows:
+                break
+            raws.append(raw)
+
+            page_candles = self._parse_candles(symbol, timeframe, rows, now_ms())
+            new = sum(1 for c in page_candles if c.ts not in collected)
+            for c in page_candles:
+                collected.setdefault(c.ts, c)
+
+            oldest = page_candles[0].ts
+            next_end = oldest - 1
+            if new == 0 or (end_ts is not None and next_end >= end_ts):
+                break  # no progress -> reached start of history
+            end_ts = next_end
+            time.sleep(pause)
+
+        candles = sorted(collected.values(), key=lambda c: c.ts)
+        return (candles[-total:] if len(candles) > total else candles), raws
 
     def _check(self, raw: dict, what: str) -> dict:
         if raw.get("code") not in (0, "0"):
