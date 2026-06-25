@@ -81,13 +81,40 @@ export interface Sentiment {
     outlook_score?: number;
     label?: string;
     confidence?: number;
+    context_tilt?: number;
     direction_prob_6h?: number | null;
+    horizons?: { horizon_seconds?: number; label?: string; score?: number; confidence?: number }[];
   };
   context?: {
     fear_greed_value?: number;
     fear_greed_label?: string;
     btc_dominance_pct?: number;
     market_cap_change_24h_pct?: number;
+  } | null;
+  snapshot?: {
+    average_sentiment?: number;
+    sentiment_velocity?: number;
+    attention_spike?: number;
+    data_quality?: number;
+    message_count?: number;
+    price_change_pct?: number;
+  } | null;
+  positioning?: {
+    global_account_ratio?: number;
+    top_account_ratio?: number;
+    top_position_ratio?: number;
+    taker_ratio?: number;
+    signal?: string;
+  } | null;
+  derivatives?: {
+    funding_rate?: number;
+    open_interest_usd?: number;
+    funding_signal?: string;
+  } | null;
+  insights?: {
+    event_count?: number;
+    terms?: { term?: string; count?: number }[];
+    sources?: Record<string, { count?: number; avg_sentiment?: number }>;
   } | null;
   direction_prob_6h?: number | null;
   alerts?: Record<string, unknown> | null;

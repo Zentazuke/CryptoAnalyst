@@ -66,12 +66,17 @@ class SentimentClient:
             "positioning": outlook.get("positioning"),
             "direction_prob_6h": outlook.get("direction_prob_6h"),
         }
-        try:
-            out["alerts"] = self._get(f"/alerts/{key}")
-        except Exception:
-            out["alerts"] = None
-        try:
-            out["recent"] = self._get(f"/social/{key}/recent?limit=6")
-        except Exception:
-            out["recent"] = None
+
+        def fetch(name: str, path: str, unwrap: str | None = None):
+            try:
+                data = self._get(path)
+                out[name] = data.get(unwrap) if unwrap else data
+            except Exception:
+                out[name] = None
+
+        fetch("snapshot", f"/snapshot/{key}")          # sentiment activity metrics
+        fetch("insights", f"/insights/{key}")          # trending terms + source split
+        fetch("derivatives", f"/derivatives/{key}", unwrap="derivatives")
+        fetch("alerts", f"/alerts/{key}")
+        fetch("recent", f"/social/{key}/recent?limit=6")
         return out
