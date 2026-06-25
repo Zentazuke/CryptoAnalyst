@@ -57,6 +57,23 @@ export interface ChartResponse {
   quality: QualityCheck | null;
 }
 
+export interface Commentary {
+  symbol: string;
+  timeframe: string;
+  as_of: string;
+  headline: string;
+  whats_happening: string[];
+  what_it_means: string[];
+  outlook: {
+    bias: string;
+    confidence: string;
+    horizon_bars: number;
+    text: string;
+    invalidation: string | null;
+  };
+  caveat: string;
+}
+
 export interface MicroSnapshot {
   symbol: string;
   ts: number;

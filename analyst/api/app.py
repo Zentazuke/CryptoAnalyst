@@ -17,6 +17,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
+from analyst.commentary import generate_commentary
 from analyst.config import DB_PATH, DEFAULT_TIMEFRAME
 from analyst.features import compute_indicators, snapshot
 from analyst.features.engine import INDICATOR_VERSION
@@ -169,6 +170,21 @@ def regime_calibration(
         raise HTTPException(status_code=404, detail=f"no {timeframe} data for {symbol}")
     report = calibrate(rows, params={"horizon": horizon})
     return {"symbol": symbol, "timeframe": timeframe, **report}
+
+
+@app.get("/commentary/{symbol}")
+def commentary(
+    symbol: str,
+    timeframe: str = Query(default=DEFAULT_TIMEFRAME),
+) -> dict:
+    """A written analyst note: what's happening, what it means, and an outlook."""
+    rows = store().get_candles(symbol, timeframe)
+    if not rows:
+        raise HTTPException(status_code=404, detail=f"no {timeframe} data for {symbol}")
+    micro_rows = store().get_micro(symbol, limit=1)
+    micro = micro_rows[0] if micro_rows else None
+    note = generate_commentary(rows, timeframe, micro=micro)
+    return {"symbol": symbol, "timeframe": timeframe, "as_of": ms_to_iso(rows[-1]["ts"]), **note}
 
 
 def _line(times: list[int], arr) -> list[dict]:

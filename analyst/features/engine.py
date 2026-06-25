@@ -105,8 +105,12 @@ def snapshot(candles: Sequence[Any], params: dict | None = None) -> dict:
     values = {name: _last_finite(arr) for name, arr in series.items()}
 
     last = candles[-1]
-    last_ts = last["ts"] if isinstance(last, dict) else last.ts
-    source = last["source"] if isinstance(last, dict) else last.source
+
+    def _attr(obj, key):
+        return obj.get(key) if isinstance(obj, dict) else getattr(obj, key, None)
+
+    last_ts = _attr(last, "ts")
+    source = _attr(last, "source")
     meta = {
         "indicator_version": INDICATOR_VERSION,
         "bars": len(candles),
