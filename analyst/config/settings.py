@@ -13,6 +13,21 @@ from pathlib import Path
 # repo root = two levels up from this file (analyst/config/settings.py)
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
+# Load .env (if present) so secrets/config live outside the code. Best-effort:
+# python-dotenv ships as a transitive dependency; if absent we just skip.
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv(PROJECT_ROOT / ".env")
+except Exception:  # pragma: no cover - optional
+    pass
+
+# Binance SPOT testnet credentials — only used by the future bot/execution
+# layer. The analyst's data comes from free public endpoints and needs no key.
+BINANCE_TESTNET: bool = os.environ.get("BINANCE_TESTNET", "false").lower() == "true"
+BINANCE_TESTNET_API_KEY: str | None = os.environ.get("BINANCE_TESTNET_API_KEY")
+BINANCE_TESTNET_API_SECRET: str | None = os.environ.get("BINANCE_TESTNET_API_SECRET")
+
 DATA_DIR = Path(os.environ.get("ANALYST_DATA_DIR", PROJECT_ROOT / "data"))
 RAW_DIR = DATA_DIR / "raw"
 DB_PATH = DATA_DIR / "analyst.duckdb"
