@@ -20,6 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from analyst.config import DB_PATH, DEFAULT_TIMEFRAME
 from analyst.features import compute_indicators, snapshot
 from analyst.features.engine import INDICATOR_VERSION
+from analyst.regime import calibrate, classify_latest, classify_series
 from analyst.storage import Store
 from analyst.utils import ms_to_iso, now_ms
 
@@ -135,6 +136,40 @@ def microstructure(
     return {"symbol": symbol, "count": len(rows), "snapshots": rows}
 
 
+@app.get("/regime/{symbol}")
+def regime(
+    symbol: str,
+    timeframe: str = Query(default=DEFAULT_TIMEFRAME),
+    limit: int = Query(default=1, ge=1, le=2000),
+) -> dict:
+    """Current (or recent) regime call(s) with confidence and reasons."""
+    rows = store().get_candles(symbol, timeframe)
+    if not rows:
+        raise HTTPException(status_code=404, detail=f"no {timeframe} data for {symbol}")
+    results = classify_series(rows)
+    recent = results[-limit:]
+    return {
+        "symbol": symbol,
+        "timeframe": timeframe,
+        "current": results[-1].model_dump(),
+        "recent": [r.model_dump() for r in recent],
+    }
+
+
+@app.get("/regime/{symbol}/calibration")
+def regime_calibration(
+    symbol: str,
+    timeframe: str = Query(default=DEFAULT_TIMEFRAME),
+    horizon: int = Query(default=12, ge=1, le=200),
+) -> dict:
+    """Backtest the classifier's calls vs forward outcomes (measured accuracy)."""
+    rows = store().get_candles(symbol, timeframe)
+    if not rows:
+        raise HTTPException(status_code=404, detail=f"no {timeframe} data for {symbol}")
+    report = calibrate(rows, params={"horizon": horizon})
+    return {"symbol": symbol, "timeframe": timeframe, **report}
+
+
 def _line(times: list[int], arr) -> list[dict]:
     """Pack an indicator array into [{time, value}], dropping NaN warmup points."""
     out = []
@@ -185,6 +220,12 @@ def chart(
     checks = store().quality(symbol, limit=1)
     quality = checks[0] if checks else None
 
+    regime_results = classify_series(rows)
+    regime_series = [
+        {"time": t, "label": r.label, "confidence": r.confidence}
+        for t, r in zip(times, regime_results)
+    ]
+
     return {
         "symbol": symbol,
         "timeframe": timeframe,
@@ -196,5 +237,7 @@ def chart(
         "volume": volume,
         "overlays": overlays,
         "panels": panels,
+        "regime": regime_series,
+        "regime_current": regime_results[-1].model_dump(),
         "quality": quality,
     }

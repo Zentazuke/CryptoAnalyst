@@ -37,6 +37,8 @@ uv pip install --python .venv\Scripts\python.exe -e .
 - `GET /quality/{symbol}` — recent data-quality results
 - `GET /indicators/{symbol}?timeframe=1h` — latest TA snapshot (A1)
 - `GET /microstructure/{symbol}?limit=1` — spread/depth/OI/funding/basis (A2)
+- `GET /regime/{symbol}` — current regime call + confidence + reasons (A3)
+- `GET /regime/{symbol}/calibration?horizon=12` — measured hit-rate vs base rate (A3)
 
 ### Test
 
@@ -66,8 +68,11 @@ data/          duckdb file + raw/ archive (gitignored)
 - [x] **A2 Microstructure** — bid-ask spread, ±band order-book depth, open
   interest, funding rate, mark/index basis (all free public endpoints).
   Snapshots via `python -m analyst.collect_micro`
-- [ ] A3 Regime classifier + calibration
-- [ ] A4 Dashboards + alerts
+- [x] **A3 Regime classifier + calibration** — transparent, causal
+  range/trend/breakout/flash/low-vol calls with confidence + reasons, plus a
+  calibration harness that backtests calls vs forward outcomes (hit-rate, base
+  rate, lift). Trend labels show lift > 1 on live BTC/ETH 1h.
+- [ ] A4 Dashboards + alerts (regime ribbon, combo-alerts)
 - [ ] A5 On-chain · A6 Sentiment/options · A7 Research workbench
 
 ### Indicator conventions
