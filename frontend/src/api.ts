@@ -4,13 +4,32 @@ import type { ChartResponse, Commentary, MicroSnapshot, Sentiment } from "./type
 // vite.config.ts). This sidesteps browser CORS and IPv4/IPv6 loopback issues.
 const BASE = import.meta.env.VITE_API_BASE ?? "/api";
 
-async function getJSON<T>(path: string): Promise<T> {
-  const resp = await fetch(`${BASE}${path}`);
-  if (!resp.ok) {
-    const text = await resp.text().catch(() => "");
-    throw new Error(`API ${resp.status}: ${text || resp.statusText}`);
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// Retry transient failures (network errors + 5xx) — the analyst API can take a
+// few seconds to finish booting (pandas/TA-Lib/sklearn + model), so an early
+// request shouldn't surface as a hard error.
+async function getJSON<T>(path: string, attempts = 4): Promise<T> {
+  let lastErr: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const resp = await fetch(`${BASE}${path}`);
+      if (resp.ok) return resp.json();
+      if (resp.status >= 500 && i < attempts - 1) {
+        await sleep(800);
+        continue;
+      }
+      const text = await resp.text().catch(() => "");
+      throw new Error(`API ${resp.status}: ${text || resp.statusText}`);
+    } catch (e) {
+      lastErr = e;
+      if (i < attempts - 1) {
+        await sleep(800);
+        continue;
+      }
+    }
   }
-  return resp.json();
+  throw lastErr instanceof Error ? lastErr : new Error("request failed");
 }
 
 export function fetchChart(symbol: string, timeframe: string, limit = 600): Promise<ChartResponse> {

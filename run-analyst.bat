@@ -53,9 +53,9 @@ REM --- start the visualizer in its own window -------------------------------
 echo [web] Starting visualizer on port %WEB_PORT% ...
 start "Analyst Frontend" /D "%~dp0frontend" cmd /k npm run dev
 
-REM --- wait for the dev server, then open the browser -----------------------
-echo [wait] Letting servers boot...
-timeout /t 6 /nobreak >nul
+REM --- wait for the analyst API to be ready, then open the browser ----------
+echo [wait] Waiting for the analyst API to be ready...
+powershell -NoProfile -Command "$u='http://127.0.0.1:%API_PORT%/health'; for($i=0;$i -lt 60;$i++){ try{ if((Invoke-WebRequest $u -UseBasicParsing -TimeoutSec 2).StatusCode -eq 200){ Write-Host '  API ready.'; exit 0 } }catch{}; Start-Sleep -Milliseconds 700 }"
 echo [open] Opening %WEB_URL%
 start "" "%WEB_URL%"
 
