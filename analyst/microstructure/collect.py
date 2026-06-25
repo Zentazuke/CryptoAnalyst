@@ -9,7 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from analyst.config import DEPTH_BAND_BPS, PERP_FOR, RAW_DIR
+from analyst.config import DEPTH_BAND_BPS, RAW_DIR
 from analyst.ingestion.archive import archive_raw
 from analyst.microstructure.compute import (
     basis_bps,
@@ -44,7 +44,7 @@ def collect_microstructure(
     raws: dict[str, Any] = {"book": raw_book}
     oi = funding = mark = index = basis = None
 
-    perp = PERP_FOR.get(symbol)
+    perp = source.perp_for(symbol)
     if perp:
         pticker, raw_pt = source.fetch_ticker(perp)
         oi = pticker.get("oi")

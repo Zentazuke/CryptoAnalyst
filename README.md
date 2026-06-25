@@ -9,8 +9,15 @@ data-quality checks (starting with gap detection) gate what we believe.
 
 ## Phase A0 — Foundation (this milestone)
 
-Ingest live OHLCV from the Crypto.com public REST API, persist to DuckDB with
-provenance, archive raw payloads, and detect gaps.
+Ingest live OHLCV from a public exchange API (no key needed), persist to DuckDB
+with provenance, archive raw payloads, and detect gaps.
+
+### Data source
+
+Default is **Binance** public data (up to 1000 klines/request, deep funding
+history, open interest). Switch with `ANALYST_EXCHANGE=cryptocom` (or `binance`).
+Internal symbols use `BASE_QUOTE` (e.g. `BTC_USDT`); adapters translate per venue.
+Market data is public — the Binance testnet key in `.env` is only for the bot.
 
 ### Setup
 

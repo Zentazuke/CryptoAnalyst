@@ -17,8 +17,8 @@ from analyst.config import (
     RAW_DIR,
 )
 from analyst.ingestion.archive import archive_raw
+from analyst.ingestion import make_source
 from analyst.ingestion.base import DataSource
-from analyst.ingestion.cryptocom import CryptoComSource
 from analyst.models import GapReport, IngestResult
 from analyst.quality import detect_gaps
 from analyst.storage import Store
@@ -63,7 +63,7 @@ def ingest_symbol(
 
 
 def run(symbols: list[str], timeframe: str, count: int, db_path: str | Path) -> None:
-    source = CryptoComSource()
+    source = make_source()
     try:
         with Store(db_path) as store:
             for symbol in symbols:

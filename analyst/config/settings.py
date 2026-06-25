@@ -32,6 +32,9 @@ DATA_DIR = Path(os.environ.get("ANALYST_DATA_DIR", PROJECT_ROOT / "data"))
 RAW_DIR = DATA_DIR / "raw"
 DB_PATH = DATA_DIR / "analyst.duckdb"
 
+# Active market-data exchange: "binance" (default) or "cryptocom".
+EXCHANGE: str = os.environ.get("ANALYST_EXCHANGE", "binance").lower()
+
 # Crypto.com Exchange public REST API (no auth needed for market data).
 CRYPTOCOM_REST_BASE = "https://api.crypto.com/exchange/v1"
 

@@ -24,7 +24,7 @@ from tenacity import (
     wait_exponential,
 )
 
-from analyst.config import CRYPTOCOM_REST_BASE
+from analyst.config import CRYPTOCOM_REST_BASE, PERP_FOR
 from analyst.models import Candle
 from analyst.utils import now_ms
 
@@ -53,6 +53,10 @@ class CryptoComSource:
     def close(self) -> None:
         if self._own_client:
             self._client.close()
+
+    def perp_for(self, symbol: str) -> str | None:
+        """Mapped perpetual instrument for a spot symbol (None if unmapped)."""
+        return PERP_FOR.get(symbol)
 
     def __enter__(self) -> "CryptoComSource":
         return self

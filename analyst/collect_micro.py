@@ -10,14 +10,14 @@ from __future__ import annotations
 import argparse
 
 from analyst.config import DB_PATH, DEFAULT_SYMBOLS, DEPTH_BAND_BPS
-from analyst.ingestion.cryptocom import CryptoComSource
+from analyst.ingestion import make_source
 from analyst.microstructure import collect_microstructure
 from analyst.storage import Store
 from analyst.utils import ms_to_iso
 
 
 def run(symbols: list[str], db_path, band_bps: float, book_depth: int) -> None:
-    source = CryptoComSource()
+    source = make_source()
     try:
         with Store(db_path) as store:
             for symbol in symbols:

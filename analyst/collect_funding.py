@@ -6,18 +6,18 @@ from __future__ import annotations
 
 import argparse
 
-from analyst.config import DB_PATH, DEFAULT_SYMBOLS, PERP_FOR
-from analyst.ingestion.cryptocom import CryptoComSource
+from analyst.config import DB_PATH, DEFAULT_SYMBOLS
+from analyst.ingestion import make_source
 from analyst.storage import Store
 from analyst.utils import ms_to_iso
 
 
 def run(symbols: list[str], count: int, db_path) -> None:
-    source = CryptoComSource()
+    source = make_source()
     try:
         with Store(db_path) as store:
             for symbol in symbols:
-                perp = PERP_FOR.get(symbol)
+                perp = source.perp_for(symbol)
                 if not perp:
                     print(f"  {symbol:<10} no perp mapping — skipped")
                     continue

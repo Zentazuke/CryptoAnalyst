@@ -12,6 +12,9 @@ TS = 1_700_000_000_000
 class FakeMicroSource:
     name = "fake"
 
+    def perp_for(self, symbol):
+        return "FAKE-PERP" if symbol == "BTC_USDT" else None
+
     def fetch_orderbook(self, symbol, depth=50):
         book = {
             "bids": [[99.5, 2.0], [99.0, 3.0], [98.0, 5.0]],
