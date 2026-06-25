@@ -11,11 +11,15 @@ A read-only DuckDB connection is opened for the app's lifetime. Run with:
 """
 from __future__ import annotations
 
+import math
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 
 from analyst.config import DB_PATH, DEFAULT_TIMEFRAME
+from analyst.features import compute_indicators, snapshot
+from analyst.features.engine import INDICATOR_VERSION
 from analyst.storage import Store
 from analyst.utils import ms_to_iso, now_ms
 
@@ -34,6 +38,14 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Crypto Analyst", version="0.1.0", lifespan=lifespan)
+
+# Local dev: allow the Vite frontend (any localhost port) to call the API.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=r"http://(localhost|127\.0\.0\.1):\d+",
+    allow_methods=["GET"],
+    allow_headers=["*"],
+)
 
 
 def store() -> Store:
@@ -90,3 +102,82 @@ def candles(
 @app.get("/quality/{symbol}")
 def quality(symbol: str, limit: int = Query(default=20, ge=1, le=200)) -> dict:
     return {"symbol": symbol, "checks": store().quality(symbol, limit=limit)}
+
+
+@app.get("/indicators/{symbol}")
+def indicators(
+    symbol: str,
+    timeframe: str = Query(default=DEFAULT_TIMEFRAME),
+) -> dict:
+    """Latest technical-indicator snapshot computed from stored candles."""
+    rows = store().get_candles(symbol, timeframe)
+    if not rows:
+        raise HTTPException(status_code=404, detail=f"no {timeframe} data for {symbol}")
+    snap = snapshot(rows)
+    snap["meta"]["last_candle"] = ms_to_iso(snap["meta"]["last_ts"])
+    return {"symbol": symbol, "timeframe": timeframe, **snap}
+
+
+def _line(times: list[int], arr) -> list[dict]:
+    """Pack an indicator array into [{time, value}], dropping NaN warmup points."""
+    out = []
+    for t, v in zip(times, arr):
+        fv = float(v)
+        if math.isfinite(fv):
+            out.append({"time": t, "value": fv})
+    return out
+
+
+@app.get("/chart/{symbol}")
+def chart(
+    symbol: str,
+    timeframe: str = Query(default=DEFAULT_TIMEFRAME),
+    limit: int = Query(default=500, ge=10, le=5000),
+) -> dict:
+    """Candles + full engine-computed indicator series for charting.
+
+    All indicator values are produced by the Python engine (single source of
+    truth); the client never recomputes technical analysis itself. Times are
+    UTC seconds, as expected by lightweight-charts.
+    """
+    rows = store().get_candles(symbol, timeframe, limit=limit)
+    if not rows:
+        raise HTTPException(status_code=404, detail=f"no {timeframe} data for {symbol}")
+
+    times = [int(r["ts"] // 1000) for r in rows]
+    series = compute_indicators(rows)
+
+    candles = [
+        {
+            "time": t,
+            "open": r["open"], "high": r["high"], "low": r["low"], "close": r["close"],
+        }
+        for t, r in zip(times, rows)
+    ]
+    volume = [{"time": t, "value": r["volume"]} for t, r in zip(times, rows)]
+
+    overlays = {
+        name: _line(times, series[name])
+        for name in ("bb_upper", "bb_mid", "bb_lower", "ema_20", "sma_20")
+    }
+    panels = {
+        name: _line(times, series[name])
+        for name in ("rsi_14", "macd", "macd_signal", "macd_hist", "atr_14", "adx_14")
+    }
+
+    checks = store().quality(symbol, limit=1)
+    quality = checks[0] if checks else None
+
+    return {
+        "symbol": symbol,
+        "timeframe": timeframe,
+        "indicator_version": INDICATOR_VERSION,
+        "source": rows[-1]["source"],
+        "last_candle": ms_to_iso(rows[-1]["ts"]),
+        "bars": len(rows),
+        "candles": candles,
+        "volume": volume,
+        "overlays": overlays,
+        "panels": panels,
+        "quality": quality,
+    }

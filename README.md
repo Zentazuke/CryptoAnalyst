@@ -35,6 +35,7 @@ uv pip install --python .venv\Scripts\python.exe -e .
 - `GET /provenance/{symbol}` — where each series came from + when ingested
 - `GET /candles/{symbol}?timeframe=1h&limit=200`
 - `GET /quality/{symbol}` — recent data-quality results
+- `GET /indicators/{symbol}?timeframe=1h` — latest TA snapshot (A1)
 
 ### Test
 
@@ -58,6 +59,17 @@ data/          duckdb file + raw/ archive (gitignored)
 
 ## Roadmap
 
-A0 Foundation · A1 TA engine (+ reference-parity & no-lookahead tests) ·
-A2 Microstructure · A3 Regime + calibration · A4 Dashboards + alerts ·
-A5 On-chain · A6 Sentiment/options · A7 Research workbench.
+- [x] **A0 Foundation** — ingestion, DuckDB store, provenance, gap detection
+- [x] **A1 TA engine** — ATR/EMA/SMA/RSI/MACD/Bollinger/VWAP/ADX/realized-vol,
+  causal (no look-ahead), verified against TA-Lib + golden vectors + invariants
+- [ ] A2 Microstructure (spread, depth, OI, funding, basis)
+- [ ] A3 Regime classifier + calibration
+- [ ] A4 Dashboards + alerts
+- [ ] A5 On-chain · A6 Sentiment/options · A7 Research workbench
+
+### Indicator conventions
+
+EMA is SMA-seeded; RSI/ATR/ADX use Wilder smoothing; Bollinger uses population
+std — all matching the TA-Lib reference. Every indicator is **causal**: the
+value at bar *i* uses only data up to bar *i*, enforced by the no-look-ahead
+test suite.
