@@ -101,3 +101,58 @@ class CryptoComSource:
         ]
         candles.sort(key=lambda c: c.ts)
         return candles, raw
+
+    def _check(self, raw: dict, what: str) -> dict:
+        if raw.get("code") not in (0, "0"):
+            raise CryptoComError(f"API error for {what}: code={raw.get('code')}")
+        return raw.get("result") or {}
+
+    def fetch_orderbook(self, symbol: str, depth: int = 50) -> tuple[dict, dict]:
+        """Order-book snapshot. Returns ({bids, asks, t}, raw).
+
+        ``bids``/``asks`` are lists of ``[price, size]`` floats; bids descend in
+        price, asks ascend, as the venue returns them.
+        """
+        raw = self._get(
+            "/public/get-book", {"instrument_name": symbol, "depth": depth}
+        )
+        data = (self._check(raw, f"book {symbol}").get("data") or [{}])[0]
+        bids = [[float(p), float(s)] for p, s, *_ in data.get("bids", [])]
+        asks = [[float(p), float(s)] for p, s, *_ in data.get("asks", [])]
+        return {"bids": bids, "asks": asks, "t": int(data["t"])}, raw
+
+    def fetch_ticker(self, symbol: str) -> tuple[dict, dict]:
+        """Ticker snapshot. Returns (parsed, raw) with best bid/ask, last,
+        volume, and open interest (``oi``; ``None`` for spot)."""
+        raw = self._get("/public/get-tickers", {"instrument_name": symbol})
+        t = (self._check(raw, f"ticker {symbol}").get("data") or [{}])[0]
+
+        def f(key: str) -> float | None:
+            v = t.get(key)
+            return float(v) if v not in (None, "") else None
+
+        parsed = {
+            "instrument": t.get("i"),
+            "last": f("a"),
+            "bid": f("b"),
+            "ask": f("k"),
+            "volume": f("v"),
+            "oi": f("oi"),
+            "t": int(t["t"]),
+        }
+        return parsed, raw
+
+    def fetch_valuation(
+        self, symbol: str, valuation_type: str, count: int = 1
+    ) -> tuple[list[dict], dict]:
+        """Valuation series (mark_price, index_price, funding_hist, ...).
+
+        Returns (list of {t, v}, raw), oldest-to-newest."""
+        raw = self._get(
+            "/public/get-valuations",
+            {"instrument_name": symbol, "valuation_type": valuation_type, "count": count},
+        )
+        data = self._check(raw, f"valuation {valuation_type} {symbol}").get("data") or []
+        vals = [{"t": int(x["t"]), "v": float(x["v"])} for x in data]
+        vals.sort(key=lambda x: x["t"])
+        return vals, raw

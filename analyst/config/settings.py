@@ -37,3 +37,15 @@ INTERVAL_SECONDS: dict[str, int] = {
 
 DEFAULT_SYMBOLS: list[str] = ["BTC_USDT", "ETH_USDT"]
 DEFAULT_TIMEFRAME: str = "1h"
+
+# Map a spot symbol to its perpetual instrument on Crypto.com, used to source
+# open interest, funding, mark/index price, and basis. Spot symbols without a
+# perp mapping simply get null derivatives fields.
+PERP_FOR: dict[str, str] = {
+    "BTC_USDT": "BTCUSD-PERP",
+    "ETH_USDT": "ETHUSD-PERP",
+}
+
+# Default order-book band (in basis points around mid) for depth aggregation.
+DEPTH_BAND_BPS: float = 10.0
+

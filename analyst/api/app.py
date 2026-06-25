@@ -118,6 +118,23 @@ def indicators(
     return {"symbol": symbol, "timeframe": timeframe, **snap}
 
 
+@app.get("/microstructure/{symbol}")
+def microstructure(
+    symbol: str,
+    limit: int = Query(default=1, ge=1, le=2000),
+) -> dict:
+    """Latest (or recent) market-microstructure snapshot(s) for a symbol."""
+    rows = store().get_micro(symbol, limit=limit)
+    if not rows:
+        raise HTTPException(
+            status_code=404,
+            detail=f"no microstructure for {symbol} — run `python -m analyst.collect_micro`",
+        )
+    for r in rows:
+        r["snapshot_time"] = ms_to_iso(r["ts"])
+    return {"symbol": symbol, "count": len(rows), "snapshots": rows}
+
+
 def _line(times: list[int], arr) -> list[dict]:
     """Pack an indicator array into [{time, value}], dropping NaN warmup points."""
     out = []

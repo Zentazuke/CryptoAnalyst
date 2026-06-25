@@ -36,6 +36,7 @@ uv pip install --python .venv\Scripts\python.exe -e .
 - `GET /candles/{symbol}?timeframe=1h&limit=200`
 - `GET /quality/{symbol}` — recent data-quality results
 - `GET /indicators/{symbol}?timeframe=1h` — latest TA snapshot (A1)
+- `GET /microstructure/{symbol}?limit=1` — spread/depth/OI/funding/basis (A2)
 
 ### Test
 
@@ -62,7 +63,9 @@ data/          duckdb file + raw/ archive (gitignored)
 - [x] **A0 Foundation** — ingestion, DuckDB store, provenance, gap detection
 - [x] **A1 TA engine** — ATR/EMA/SMA/RSI/MACD/Bollinger/VWAP/ADX/realized-vol,
   causal (no look-ahead), verified against TA-Lib + golden vectors + invariants
-- [ ] A2 Microstructure (spread, depth, OI, funding, basis)
+- [x] **A2 Microstructure** — bid-ask spread, ±band order-book depth, open
+  interest, funding rate, mark/index basis (all free public endpoints).
+  Snapshots via `python -m analyst.collect_micro`
 - [ ] A3 Regime classifier + calibration
 - [ ] A4 Dashboards + alerts
 - [ ] A5 On-chain · A6 Sentiment/options · A7 Research workbench

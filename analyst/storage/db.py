@@ -12,7 +12,7 @@ from pathlib import Path
 
 import duckdb
 
-from analyst.models import Candle, GapReport, IngestResult
+from analyst.models import Candle, GapReport, IngestResult, MicroSnapshot
 from analyst.utils import now_ms
 
 _SCHEMA = """
@@ -52,6 +52,28 @@ CREATE TABLE IF NOT EXISTS data_quality (
     status      VARCHAR,
     detail      VARCHAR,
     created_ts  BIGINT
+);
+
+CREATE TABLE IF NOT EXISTS microstructure (
+    symbol           VARCHAR,
+    ts               BIGINT,
+    mid              DOUBLE,
+    best_bid         DOUBLE,
+    best_ask         DOUBLE,
+    spread_bps       DOUBLE,
+    depth_band_bps   DOUBLE,
+    bid_depth_base   DOUBLE,
+    ask_depth_base   DOUBLE,
+    bid_depth_quote  DOUBLE,
+    ask_depth_quote  DOUBLE,
+    open_interest    DOUBLE,
+    funding_rate     DOUBLE,
+    mark_price       DOUBLE,
+    index_price      DOUBLE,
+    basis_bps        DOUBLE,
+    source           VARCHAR,
+    ingest_ts        BIGINT,
+    PRIMARY KEY (symbol, ts)
 );
 """
 
@@ -138,7 +160,43 @@ class Store:
             [source, report.symbol, report.timeframe, ts_from, ts_to, status, detail, now_ms()],
         )
 
+    def upsert_micro(self, snap: MicroSnapshot) -> None:
+        """Insert or update a microstructure snapshot (idempotent on symbol+ts)."""
+        self.conn.execute(
+            """
+            INSERT INTO microstructure (
+                symbol, ts, mid, best_bid, best_ask, spread_bps, depth_band_bps,
+                bid_depth_base, ask_depth_base, bid_depth_quote, ask_depth_quote,
+                open_interest, funding_rate, mark_price, index_price, basis_bps,
+                source, ingest_ts
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (symbol, ts) DO UPDATE SET
+                mid = EXCLUDED.mid, best_bid = EXCLUDED.best_bid, best_ask = EXCLUDED.best_ask,
+                spread_bps = EXCLUDED.spread_bps, depth_band_bps = EXCLUDED.depth_band_bps,
+                bid_depth_base = EXCLUDED.bid_depth_base, ask_depth_base = EXCLUDED.ask_depth_base,
+                bid_depth_quote = EXCLUDED.bid_depth_quote, ask_depth_quote = EXCLUDED.ask_depth_quote,
+                open_interest = EXCLUDED.open_interest, funding_rate = EXCLUDED.funding_rate,
+                mark_price = EXCLUDED.mark_price, index_price = EXCLUDED.index_price,
+                basis_bps = EXCLUDED.basis_bps, source = EXCLUDED.source, ingest_ts = EXCLUDED.ingest_ts
+            """,
+            [
+                snap.symbol, snap.ts, snap.mid, snap.best_bid, snap.best_ask, snap.spread_bps,
+                snap.depth_band_bps, snap.bid_depth_base, snap.ask_depth_base,
+                snap.bid_depth_quote, snap.ask_depth_quote, snap.open_interest, snap.funding_rate,
+                snap.mark_price, snap.index_price, snap.basis_bps, snap.source, snap.ingest_ts,
+            ],
+        )
+
     # ---- reads ------------------------------------------------------------
+
+    def get_micro(self, symbol: str, limit: int = 1) -> list[dict]:
+        """Most recent microstructure snapshots for a symbol (newest first)."""
+        cur = self.conn.execute(
+            "SELECT * FROM microstructure WHERE symbol = ? ORDER BY ts DESC LIMIT ?",
+            [symbol, limit],
+        )
+        cols = [d[0] for d in cur.description]
+        return [dict(zip(cols, r)) for r in cur.fetchall()]
 
     def get_candles(self, symbol: str, timeframe: str, limit: int | None = None) -> list[dict]:
         sql = (

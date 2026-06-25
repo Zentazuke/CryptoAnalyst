@@ -36,6 +36,8 @@ if not exist "%~dp0frontend\node_modules" (
 REM --- refresh data (best-effort; harmless if offline) ----------------------
 echo [data] Refreshing BTC/ETH 1h candles ^(best-effort^)...
 "%PY%" -m analyst.ingest --symbols BTC_USDT,ETH_USDT --timeframe 1h --count 300
+echo [data] Capturing a microstructure snapshot ^(best-effort^)...
+"%PY%" -m analyst.collect_micro --symbols BTC_USDT,ETH_USDT
 echo.
 
 REM --- start the API in its own window --------------------------------------

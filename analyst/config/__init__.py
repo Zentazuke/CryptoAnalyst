@@ -5,6 +5,8 @@ from analyst.config.settings import (  # noqa: F401
     DB_PATH,
     DEFAULT_SYMBOLS,
     DEFAULT_TIMEFRAME,
+    DEPTH_BAND_BPS,
     INTERVAL_SECONDS,
+    PERP_FOR,
     RAW_DIR,
 )

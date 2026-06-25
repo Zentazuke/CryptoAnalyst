@@ -41,6 +41,34 @@ class IngestResult(BaseModel):
     status: str = "ok"
 
 
+class MicroSnapshot(BaseModel):
+    """A point-in-time market-microstructure snapshot with provenance.
+
+    Spot fields (mid/spread/depth) come from the order book; derivatives fields
+    (open interest, funding, mark/index, basis) come from the mapped perpetual
+    and are ``None`` when no perp is mapped.
+    """
+
+    symbol: str
+    ts: int
+    mid: float
+    best_bid: float
+    best_ask: float
+    spread_bps: float
+    depth_band_bps: float
+    bid_depth_base: float
+    ask_depth_base: float
+    bid_depth_quote: float
+    ask_depth_quote: float
+    open_interest: float | None = None
+    funding_rate: float | None = None
+    mark_price: float | None = None
+    index_price: float | None = None
+    basis_bps: float | None = None
+    source: str
+    ingest_ts: int
+
+
 class GapReport(BaseModel):
     """Result of a gap check over a contiguous candle series.
 
