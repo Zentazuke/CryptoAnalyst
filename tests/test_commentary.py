@@ -42,6 +42,20 @@ def test_deterministic():
     assert a == b  # no randomness in the note
 
 
+def test_sentiment_confluence_agreement():
+    up = _candles(100.0 * (1.0 + np.linspace(0, 0.8, 200)))  # trend_up -> bullish tech
+    note = generate_commentary(up, "1h", sentiment={"outlook": {"label": "bullish", "outlook_score": 0.4}})
+    assert "Confluence" in note["outlook"]["text"]
+    assert note["outlook"].get("sentiment_bias") == "bullish"
+
+
+def test_sentiment_confluence_divergence():
+    down = _candles(100.0 * (1.0 - np.linspace(0, 0.6, 200)))  # trend_down -> bearish tech
+    note = generate_commentary(down, "1h", sentiment={"outlook": {"label": "bullish"}, "context": {"fear_greed_value": 80}})
+    assert "Divergence" in note["outlook"]["text"]
+    assert note["outlook"]["confidence"] == "low"
+
+
 def test_micro_positioning_mentioned():
     candles = _candles(100.0 + np.cumsum(np.random.default_rng(2).normal(0, 0.3, 200)))
     micro = {"funding_rate": -0.0002, "basis_bps": -5.0, "spread_bps": 1.0}

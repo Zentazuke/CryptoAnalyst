@@ -60,8 +60,20 @@ def _closes(candles: list[Any]) -> np.ndarray:
     return np.array([c["close"] if isinstance(c, dict) else c.close for c in candles], float)
 
 
+def _sentiment_bias(label: str | None) -> str:
+    if not label:
+        return "neutral"
+    low = label.lower()
+    if "bull" in low:
+        return "bullish"
+    if "bear" in low:
+        return "bearish"
+    return "neutral"
+
+
 def generate_commentary(
-    candles: list[Any], timeframe: str, micro: dict | None = None, horizon: int | None = None
+    candles: list[Any], timeframe: str, micro: dict | None = None,
+    horizon: int | None = None, sentiment: dict | None = None,
 ) -> dict:
     if len(candles) < 60:
         return {
@@ -152,7 +164,36 @@ def generate_commentary(
         if sp is not None and sp > 3:
             happening.append(f"Top-of-book spread is wide ({sp:.1f} bps) — thinner liquidity, more slippage risk.")
 
+    # --- sentiment & context (from the sentiment engine, if available) ---
+    sent_bias = None
+    if sentiment and sentiment.get("outlook"):
+        ol = sentiment["outlook"]
+        label = ol.get("label")
+        sent_bias = _sentiment_bias(label)
+        score, conf = ol.get("outlook_score"), ol.get("confidence")
+        bits = f"Sentiment outlook is {label}" if label else "Sentiment outlook available"
+        if score is not None:
+            bits += f" (score {score:+.2f}{f', confidence {conf:.0%}' if isinstance(conf, (int, float)) else ''})"
+        happening.append(bits + ".")
+        ctx = sentiment.get("context") or {}
+        fg, fgl, dom = ctx.get("fear_greed_value"), ctx.get("fear_greed_label"), ctx.get("btc_dominance_pct")
+        if fg is not None:
+            happening.append(f"Fear & Greed is {fg:.0f}{f' ({fgl})' if fgl else ''}" + (f"; BTC dominance {dom:.1f}%." if dom is not None else "."))
+            if fg <= 25:
+                meaning.append("Extreme fear has historically clustered near local bottoms — contrarian-bullish context.")
+            elif fg >= 75:
+                meaning.append("Extreme greed signals froth — late-stage moves are more reversal-prone.")
+        dp = sentiment.get("direction_prob_6h")
+        if dp is not None:
+            happening.append(f"The engine's learned 6h up-probability (sentiment + positioning) is {dp:.0%}.")
+        alerts = sentiment.get("alerts") or {}
+        shock = alerts.get("shock") or alerts.get("level") or alerts.get("alert")
+        if shock and str(shock).lower() not in ("none", "false", "calm", "normal"):
+            happening.append(f"Shock alert: {shock}.")
+            meaning.append("An active panic/euphoria shock means headline-driven volatility — be cautious with mechanical signals.")
+
     outlook = _outlook(reg, cal, horizon, timeframe, close, ema, bb_m, bb_u, bb_l, chg)
+    _apply_confluence(outlook, BIAS.get(reg.label, "neutral"), sent_bias)
     headline = _headline(reg, outlook, close)
 
     return {
@@ -233,6 +274,29 @@ def _outlook(reg, cal, horizon, timeframe, close, ema, bb_m, bb_u, bb_l, chg) ->
         invalidation = None
 
     return {"bias": bias, "confidence": conf, "horizon_bars": horizon, "text": text, "invalidation": invalidation}
+
+
+def _apply_confluence(outlook: dict, tech_bias: str, sent_bias: str | None) -> None:
+    """Fuse the technical bias with the sentiment bias into the outlook text."""
+    if sent_bias is None:
+        return
+    directional = {"bullish", "bearish"}
+    tech_dir = tech_bias if tech_bias in directional else None
+    if tech_dir and sent_bias in directional:
+        if tech_dir == sent_bias:
+            outlook["text"] += (
+                f" Confluence: technicals and sentiment both lean {sent_bias} — that agreement raises conviction."
+            )
+            outlook["confidence"] = "medium" if outlook["confidence"] in ("low", "low-to-medium") else outlook["confidence"]
+        else:
+            outlook["text"] += (
+                f" Divergence: price structure is {tech_dir} while sentiment is {sent_bias}. "
+                "Divergences often precede volatility or a reversal — treat the directional lean cautiously."
+            )
+            outlook["confidence"] = "low"
+    elif sent_bias in directional:
+        outlook["text"] += f" Sentiment is {sent_bias}, a {('supportive' if sent_bias == tech_bias else 'contextual')} backdrop to the {tech_bias} technical read."
+    outlook["sentiment_bias"] = sent_bias
 
 
 def _headline(reg, outlook, close) -> str:

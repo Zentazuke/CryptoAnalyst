@@ -74,6 +74,26 @@ export interface Commentary {
   caveat: string;
 }
 
+export interface Sentiment {
+  symbol: string;
+  available: boolean;
+  outlook?: {
+    outlook_score?: number;
+    label?: string;
+    confidence?: number;
+    direction_prob_6h?: number | null;
+  };
+  context?: {
+    fear_greed_value?: number;
+    fear_greed_label?: string;
+    btc_dominance_pct?: number;
+    market_cap_change_24h_pct?: number;
+  } | null;
+  direction_prob_6h?: number | null;
+  alerts?: Record<string, unknown> | null;
+  recent?: { events?: { text?: string; score?: number; source?: string }[] } | null;
+}
+
 export interface MicroSnapshot {
   symbol: string;
   ts: number;

@@ -6,10 +6,12 @@ interface Props {
   onSymbol: (s: string) => void;
   onTimeframe: (t: string) => void;
   onRefresh: () => void;
+  auto: boolean;
+  onAuto: (v: boolean) => void;
 }
 
 export function Controls({
-  symbol, timeframe, symbols, timeframes, onSymbol, onTimeframe, onRefresh,
+  symbol, timeframe, symbols, timeframes, onSymbol, onTimeframe, onRefresh, auto, onAuto,
 }: Props) {
   return (
     <div className="controls">
@@ -28,6 +30,12 @@ export function Controls({
       </select>
 
       <button onClick={onRefresh} title="Reload from the analyst API">↻ Refresh</button>
+
+      <label className="auto-toggle" title="Re-fetch every 5s for a live view">
+        <input type="checkbox" checked={auto} onChange={(e) => onAuto(e.target.checked)} />
+        Live
+        {auto && <span className="live-dot" />}
+      </label>
     </div>
   );
 }

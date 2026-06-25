@@ -19,6 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from analyst.commentary import generate_commentary
 from analyst.config import DB_PATH, DEFAULT_TIMEFRAME
+from analyst.ingestion.sentiment import SentimentClient
 from analyst.features import compute_indicators, snapshot
 from analyst.features.engine import INDICATOR_VERSION
 from analyst.regime import calibrate, classify_latest, classify_series
@@ -172,6 +173,16 @@ def regime_calibration(
     return {"symbol": symbol, "timeframe": timeframe, **report}
 
 
+@app.get("/sentiment/{symbol}")
+def sentiment(symbol: str) -> dict:
+    """Live sentiment from the sentiment engine, or {available: false} if offline."""
+    with SentimentClient() as sc:
+        bundle = sc.bundle(symbol)
+    if bundle is None:
+        return {"symbol": symbol, "available": False}
+    return {"symbol": symbol, "available": True, **bundle}
+
+
 @app.get("/commentary/{symbol}")
 def commentary(
     symbol: str,
@@ -183,7 +194,9 @@ def commentary(
         raise HTTPException(status_code=404, detail=f"no {timeframe} data for {symbol}")
     micro_rows = store().get_micro(symbol, limit=1)
     micro = micro_rows[0] if micro_rows else None
-    note = generate_commentary(rows, timeframe, micro=micro)
+    with SentimentClient() as sc:
+        sentiment_bundle = sc.bundle(symbol)
+    note = generate_commentary(rows, timeframe, micro=micro, sentiment=sentiment_bundle)
     return {"symbol": symbol, "timeframe": timeframe, "as_of": ms_to_iso(rows[-1]["ts"]), **note}
 
 

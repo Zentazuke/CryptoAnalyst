@@ -10,4 +10,5 @@ from analyst.config.settings import (  # noqa: F401
     INTERVAL_SECONDS,
     PERP_FOR,
     RAW_DIR,
+    SENTIMENT_API_BASE,
 )

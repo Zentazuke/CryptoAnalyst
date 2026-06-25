@@ -35,6 +35,10 @@ DB_PATH = DATA_DIR / "analyst.duckdb"
 # Active market-data exchange: "binance" (default) or "cryptocom".
 EXCHANGE: str = os.environ.get("ANALYST_EXCHANGE", "binance").lower()
 
+# Sentiment engine API (separate real-time service). The analyst consumes it as
+# a live sentiment source and degrades gracefully when it is offline.
+SENTIMENT_API_BASE: str = os.environ.get("SENTIMENT_API_BASE", "http://127.0.0.1:8787")
+
 # Crypto.com Exchange public REST API (no auth needed for market data).
 CRYPTOCOM_REST_BASE = "https://api.crypto.com/exchange/v1"
 

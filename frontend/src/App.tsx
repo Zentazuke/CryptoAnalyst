@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
-import { fetchChart, fetchMicro, fetchCommentary, API_BASE } from "./api";
-import type { ChartResponse, Commentary, MicroSnapshot } from "./types";
+import { fetchChart, fetchMicro, fetchCommentary, fetchSentiment, API_BASE } from "./api";
+import type { ChartResponse, Commentary, MicroSnapshot, Sentiment } from "./types";
 import { Controls } from "./components/Controls";
 import { TrustBar } from "./components/TrustBar";
 import { Dashboard } from "./components/Dashboard";
 import { RegimeCard } from "./components/RegimeCard";
 import { MicrostructureCard } from "./components/MicrostructureCard";
 import { CommentaryCard } from "./components/CommentaryCard";
+import { SentimentCard } from "./components/SentimentCard";
 
 const SYMBOLS = ["BTC_USDT", "ETH_USDT"];
 const TIMEFRAMES = ["1h", "4h", "1D"];
@@ -17,17 +18,25 @@ export default function App() {
   const [data, setData] = useState<ChartResponse | null>(null);
   const [micro, setMicro] = useState<MicroSnapshot | null>(null);
   const [note, setNote] = useState<Commentary | null>(null);
+  const [sentiment, setSentiment] = useState<Sentiment | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [auto, setAuto] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
     setError(null);
-    Promise.all([fetchChart(symbol, timeframe), fetchMicro(symbol), fetchCommentary(symbol, timeframe)])
-      .then(([chart, m, n]) => {
+    Promise.all([
+      fetchChart(symbol, timeframe),
+      fetchMicro(symbol),
+      fetchCommentary(symbol, timeframe),
+      fetchSentiment(symbol),
+    ])
+      .then(([chart, m, n, s]) => {
         setData(chart);
         setMicro(m);
         setNote(n);
+        setSentiment(s);
       })
       .catch((e: Error) => {
         setData(null);
@@ -39,6 +48,13 @@ export default function App() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // real-time feel: poll while auto-refresh is on
+  useEffect(() => {
+    if (!auto) return;
+    const id = setInterval(load, 5000);
+    return () => clearInterval(id);
+  }, [auto, load]);
 
   return (
     <div className="app">
@@ -54,6 +70,8 @@ export default function App() {
           onSymbol={setSymbol}
           onTimeframe={setTimeframe}
           onRefresh={load}
+          auto={auto}
+          onAuto={setAuto}
         />
       </header>
 
@@ -67,6 +85,8 @@ export default function App() {
           <MicrostructureCard micro={micro} />
         </div>
       )}
+
+      {data && <SentimentCard sentiment={sentiment} />}
 
       {loading && <div className="status">Loading {symbol} {timeframe}…</div>}
 
