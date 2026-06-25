@@ -196,7 +196,10 @@ def commentary(
     micro = micro_rows[0] if micro_rows else None
     with SentimentClient() as sc:
         sentiment_bundle = sc.bundle(symbol)
-    note = generate_commentary(rows, timeframe, micro=micro, sentiment=sentiment_bundle)
+    funding_rows = store().get_funding(symbol)
+    note = generate_commentary(
+        rows, timeframe, micro=micro, sentiment=sentiment_bundle, funding_rows=funding_rows
+    )
     return {"symbol": symbol, "timeframe": timeframe, "as_of": ms_to_iso(rows[-1]["ts"]), **note}
 
 

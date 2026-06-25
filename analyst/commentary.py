@@ -15,6 +15,7 @@ from typing import Any
 
 import numpy as np
 
+from analyst.crowd import calibrate_funding_contrarian
 from analyst.features import snapshot
 from analyst.regime import calibrate, classify_latest
 from analyst.regime import classifier as C
@@ -122,6 +123,7 @@ def _sentiment_bias(label: str | None) -> str:
 def generate_commentary(
     candles: list[Any], timeframe: str, micro: dict | None = None,
     horizon: int | None = None, sentiment: dict | None = None,
+    funding_rows: list[dict] | None = None,
 ) -> dict:
     if len(candles) < 60:
         return {
@@ -215,12 +217,19 @@ def generate_commentary(
     # --- sentiment & context (from the sentiment engine, if available) ---
     sent_bias = None
     crowd = None
+    crowd_cal = calibrate_funding_contrarian(candles, funding_rows, horizon) if funding_rows else None
     if sentiment:
         crowd = _crowd_read(sentiment.get("positioning"), sentiment.get("derivatives"))
         if crowd:
             happening.append(crowd["happening"])
             if crowd["meaning"]:
                 meaning.append(crowd["meaning"])
+            if crowd_cal and crowd_cal.get("lift") is not None:
+                meaning.append(
+                    f"Measured: funding-crowding has been contrarian {crowd_cal['hit_rate'] * 100:.0f}% "
+                    f"of the time vs a {crowd_cal['base_rate'] * 100:.0f}% base "
+                    f"(lift {crowd_cal['lift']:.2f}x, n={crowd_cal['count']} over ~{crowd_cal['span_days']:.0f}d)."
+                )
     if sentiment and sentiment.get("outlook"):
         ol = sentiment["outlook"]
         label = ol.get("label")
@@ -258,7 +267,9 @@ def generate_commentary(
         if tech_bias in ("bullish", "bearish"):
             rel = (" — reinforcing the technical lean." if crowd["bias"] == tech_bias
                    else " — a contrarian counterweight to the technical lean.")
-        outlook["text"] += f" Crowd check: {crowd['summary']}{rel}"
+        lift_txt = f" (measured lift {crowd_cal['lift']:.2f}x)" if crowd_cal and crowd_cal.get("lift") else ""
+        outlook["text"] += f" Crowd check: {crowd['summary']}{rel}{lift_txt}"
+        outlook["crowd_calibration"] = crowd_cal
         if crowd["bias"] != tech_bias and tech_bias in ("bullish", "bearish"):
             outlook["confidence"] = "low" if outlook["confidence"] == "medium" else outlook["confidence"]
 
