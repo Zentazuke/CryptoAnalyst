@@ -60,6 +60,54 @@ def _closes(candles: list[Any]) -> np.ndarray:
     return np.array([c["close"] if isinstance(c, dict) else c.close for c in candles], float)
 
 
+def _crowd_read(pos: dict | None, dv: dict | None) -> dict | None:
+    """Interpret crowd positioning + funding as a contrarian setup.
+
+    Crowded longs (high long/short ratio and/or persistently positive funding)
+    are contrarian-bearish; crowded shorts are contrarian-bullish. Honest framing
+    only — crowds can stay right in strong trends.
+    """
+    pos, dv = pos or {}, dv or {}
+    ratio = pos.get("global_account_ratio")
+    funding = dv.get("funding_rate")
+    sig = pos.get("signal")
+    facts: list[str] = []
+    long_c = short_c = False
+
+    if ratio is not None:
+        facts.append(f"global L/S {ratio:.2f}x")
+        if ratio >= 1.5:
+            long_c = True
+        elif ratio <= 0.67:
+            short_c = True
+    if funding is not None:
+        facts.append(f"funding {funding * 100:+.4f}%/8h")
+        if funding >= 0.0002:
+            long_c = True
+        elif funding <= -0.0002:
+            short_c = True
+    if not facts:
+        return None
+
+    detail = ", ".join(facts) + (f"; engine signal: {sig}" if sig else "")
+    if long_c and not short_c:
+        return {
+            "happening": f"Crowd is leaning long ({detail}).",
+            "meaning": "Crowded longs are a contrarian-bearish setup — they're fuel for downside "
+                       "liquidation flushes (though in a strong uptrend the crowd can stay right).",
+            "bias": "bearish", "summary": "crowded-long → contrarian-bearish",
+        }
+    if short_c and not long_c:
+        return {
+            "happening": f"Crowd is leaning short ({detail}).",
+            "meaning": "Crowded shorts are a contrarian-bullish setup — they set up short-squeeze risk "
+                       "on any upside surprise.",
+            "bias": "bullish", "summary": "crowded-short → contrarian-bullish",
+        }
+    return {"happening": f"Crowd positioning is balanced ({detail}).", "meaning": None,
+            "bias": None, "summary": "balanced"}
+
+
 def _sentiment_bias(label: str | None) -> str:
     if not label:
         return "neutral"
@@ -166,6 +214,13 @@ def generate_commentary(
 
     # --- sentiment & context (from the sentiment engine, if available) ---
     sent_bias = None
+    crowd = None
+    if sentiment:
+        crowd = _crowd_read(sentiment.get("positioning"), sentiment.get("derivatives"))
+        if crowd:
+            happening.append(crowd["happening"])
+            if crowd["meaning"]:
+                meaning.append(crowd["meaning"])
     if sentiment and sentiment.get("outlook"):
         ol = sentiment["outlook"]
         label = ol.get("label")
@@ -193,7 +248,20 @@ def generate_commentary(
             meaning.append("An active panic/euphoria shock means headline-driven volatility — be cautious with mechanical signals.")
 
     outlook = _outlook(reg, cal, horizon, timeframe, close, ema, bb_m, bb_u, bb_l, chg)
-    _apply_confluence(outlook, BIAS.get(reg.label, "neutral"), sent_bias)
+    tech_bias = BIAS.get(reg.label, "neutral")
+    _apply_confluence(outlook, tech_bias, sent_bias)
+
+    # crowd positioning is a contrarian factor in its own right
+    if crowd and crowd.get("bias"):
+        outlook["crowd_bias"] = crowd["bias"]
+        rel = ""
+        if tech_bias in ("bullish", "bearish"):
+            rel = (" — reinforcing the technical lean." if crowd["bias"] == tech_bias
+                   else " — a contrarian counterweight to the technical lean.")
+        outlook["text"] += f" Crowd check: {crowd['summary']}{rel}"
+        if crowd["bias"] != tech_bias and tech_bias in ("bullish", "bearish"):
+            outlook["confidence"] = "low" if outlook["confidence"] == "medium" else outlook["confidence"]
+
     headline = _headline(reg, outlook, close)
 
     return {

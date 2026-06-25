@@ -101,6 +101,20 @@ export function SentimentCard({ sentiment }: { sentiment: Sentiment | null }) {
       </div>
 
       <h4 className="commentary-h">Positioning &amp; derivatives</h4>
+      {(() => {
+        const ratio = pos.global_account_ratio;
+        const fr = dv.funding_rate;
+        const longC = (ratio != null && ratio >= 1.5) || (fr != null && fr >= 0.0002);
+        const shortC = (ratio != null && ratio <= 0.67) || (fr != null && fr <= -0.0002);
+        if (!longC && !shortC) return ratio != null || fr != null
+          ? <div className="crowd-read" style={{ borderColor: "#8b949e", color: "#8b949e" }}>Crowd read: balanced</div> : null;
+        const bear = longC && !shortC;
+        return (
+          <div className="crowd-read" style={{ borderColor: bear ? "#f85149" : "#3fb950", color: bear ? "#f85149" : "#3fb950" }}>
+            Crowd read: {bear ? "crowded long → contrarian-bearish" : "crowded short → contrarian-bullish"}
+          </div>
+        );
+      })()}
       <div className="stat-grid">
         <Stat label="Crowd signal" value={pos.signal ?? "—"} />
         <Stat label="Global L/S" value={num(pos.global_account_ratio)} />

@@ -56,6 +56,24 @@ def test_sentiment_confluence_divergence():
     assert note["outlook"]["confidence"] == "low"
 
 
+def test_crowd_contrarian_long():
+    candles = _candles(100.0 + np.cumsum(np.random.default_rng(4).normal(0, 0.3, 200)))
+    sent = {"positioning": {"global_account_ratio": 2.5, "signal": "long"},
+            "derivatives": {"funding_rate": 0.0005}}
+    note = generate_commentary(candles, "1h", sentiment=sent)
+    joined = " ".join(note["whats_happening"] + note["what_it_means"]).lower()
+    assert "long" in joined and "contrarian" in joined
+    assert note["outlook"].get("crowd_bias") == "bearish"
+    assert "Crowd check" in note["outlook"]["text"]
+
+
+def test_crowd_contrarian_short():
+    candles = _candles(100.0 + np.cumsum(np.random.default_rng(5).normal(0, 0.3, 200)))
+    sent = {"positioning": {"global_account_ratio": 0.5}, "derivatives": {"funding_rate": -0.0005}}
+    note = generate_commentary(candles, "1h", sentiment=sent)
+    assert note["outlook"].get("crowd_bias") == "bullish"
+
+
 def test_micro_positioning_mentioned():
     candles = _candles(100.0 + np.cumsum(np.random.default_rng(2).normal(0, 0.3, 200)))
     micro = {"funding_rate": -0.0002, "basis_bps": -5.0, "spread_bps": 1.0}

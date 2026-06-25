@@ -239,6 +239,11 @@ header.app-head {
 }
 .src-row { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12.5px; }
 .src-item { color: var(--muted); }
+.crowd-read {
+  display: inline-block; font-size: 12.5px; font-weight: 600; margin: 0 0 10px;
+  padding: 4px 12px; border: 1px solid; border-left-width: 3px; border-radius: 6px;
+  background: rgba(255,255,255,0.02);
+}
 
 /* Sentiment headlines */
 .headlines { margin-top: 12px; }
