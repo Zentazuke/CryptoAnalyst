@@ -104,7 +104,7 @@ export interface Sentiment {
     top_account_ratio?: number;
     top_position_ratio?: number;
     taker_ratio?: number;
-    signal?: string;
+    signal?: string | number;
   } | null;
   derivatives?: {
     funding_rate?: number;

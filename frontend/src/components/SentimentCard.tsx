@@ -55,9 +55,13 @@ export function SentimentCard({ sentiment }: { sentiment: Sentiment | null }) {
   const ins = sentiment.insights ?? {};
   const color = biasColor(ol.label);
   const dp = ol.direction_prob_6h ?? sentiment.direction_prob_6h ?? null;
-  const events = sentiment.recent?.events ?? [];
-  const terms = ins.terms ?? [];
-  const sources = ins.sources ?? {};
+  const events = Array.isArray(sentiment.recent?.events) ? sentiment.recent!.events! : [];
+  const terms = Array.isArray(ins.terms) ? ins.terms : [];
+  // sources is a dict of {count, avg_sentiment}; skip non-object entries (e.g. "divergence": null)
+  const sources = Object.entries(ins.sources ?? {}).filter(
+    ([, v]) => v && typeof v === "object",
+  ) as [string, { count?: number; avg_sentiment?: number }][];
+  const crowdSignal = typeof pos.signal === "number" ? pos.signal.toFixed(2) : (pos.signal ?? "—");
 
   return (
     <div className="card">
@@ -116,26 +120,26 @@ export function SentimentCard({ sentiment }: { sentiment: Sentiment | null }) {
         );
       })()}
       <div className="stat-grid">
-        <Stat label="Crowd signal" value={pos.signal ?? "—"} />
+        <Stat label="Crowd signal" value={crowdSignal} />
         <Stat label="Global L/S" value={num(pos.global_account_ratio)} />
         <Stat label="Taker ratio" value={num(pos.taker_ratio)} />
         <Stat label="Funding (8h)" value={dv.funding_rate != null ? `${signed(dv.funding_rate * 100, 4)}%` : "—"} color={signColor(dv.funding_rate)} />
         <Stat label="Open interest" value={usd(dv.open_interest_usd)} />
       </div>
 
-      {(terms.length > 0 || Object.keys(sources).length > 0) && (
+      {(terms.length > 0 || sources.length > 0) && (
         <>
           <h4 className="commentary-h">Insights{ins.event_count != null ? ` · ${ins.event_count} events` : ""}</h4>
           {terms.length > 0 && (
             <div className="term-chips">
               {terms.slice(0, 12).map((t, i) => (
-                <span key={i} className="term-chip">{t.term ?? String(t)}{t.count ? ` ·${t.count}` : ""}</span>
+                <span key={i} className="term-chip">{t?.term ?? String(t)}{t?.count ? ` ·${t.count}` : ""}</span>
               ))}
             </div>
           )}
-          {Object.keys(sources).length > 0 && (
+          {sources.length > 0 && (
             <div className="src-row">
-              {Object.entries(sources).map(([name, s]) => (
+              {sources.map(([name, s]) => (
                 <span key={name} className="src-item">
                   {name}: <b style={{ color: signColor(s?.avg_sentiment) }}>{signed(s?.avg_sentiment)}</b>
                   <span className="muted-txt"> ({s?.count ?? 0})</span>

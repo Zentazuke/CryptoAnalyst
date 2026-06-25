@@ -8,6 +8,7 @@ import { RegimeCard } from "./components/RegimeCard";
 import { MicrostructureCard } from "./components/MicrostructureCard";
 import { CommentaryCard } from "./components/CommentaryCard";
 import { SentimentCard } from "./components/SentimentCard";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
 const SYMBOLS = ["BTC_USDT", "ETH_USDT"];
 const TIMEFRAMES = ["1h", "4h", "1D"];
@@ -77,16 +78,28 @@ export default function App() {
 
       {data && <TrustBar data={data} timeframe={timeframe} />}
 
-      {note && <CommentaryCard note={note} />}
+      {note && (
+        <ErrorBoundary name="Analyst note">
+          <CommentaryCard note={note} />
+        </ErrorBoundary>
+      )}
 
       {data && (
         <div className="cards-row">
-          <RegimeCard regime={data.regime_current} timeframe={timeframe} />
-          <MicrostructureCard micro={micro} />
+          <ErrorBoundary name="Regime card">
+            <RegimeCard regime={data.regime_current} timeframe={timeframe} />
+          </ErrorBoundary>
+          <ErrorBoundary name="Microstructure card">
+            <MicrostructureCard micro={micro} />
+          </ErrorBoundary>
         </div>
       )}
 
-      {data && <SentimentCard sentiment={sentiment} />}
+      {data && (
+        <ErrorBoundary name="Sentiment card">
+          <SentimentCard sentiment={sentiment} />
+        </ErrorBoundary>
+      )}
 
       {loading && <div className="status">Loading {symbol} {timeframe}…</div>}
 
@@ -101,7 +114,11 @@ export default function App() {
         </div>
       )}
 
-      {!loading && !error && data && <Dashboard data={data} />}
+      {!loading && !error && data && (
+        <ErrorBoundary name="Charts">
+          <Dashboard data={data} />
+        </ErrorBoundary>
+      )}
 
       <p className="footnote">
         All indicators and the regime call are computed by the Python engine (single source of

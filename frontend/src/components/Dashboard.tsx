@@ -34,13 +34,15 @@ export function Dashboard({ data }: { data: ChartResponse }) {
     const refs = [priceRef, regimeRef, rsiRef, macdRef, adxRef, fundingRef];
     if (refs.some((r) => !r.current)) return;
 
+    const charts: IChartApi[] = [];
+    try {
     const price = createChart(priceRef.current!, { ...baseOptions, height: 340 });
     const regime = createChart(regimeRef.current!, { ...baseOptions, height: 56 });
     const rsi = createChart(rsiRef.current!, { ...baseOptions, height: 130 });
     const macd = createChart(macdRef.current!, { ...baseOptions, height: 140 });
     const adx = createChart(adxRef.current!, { ...baseOptions, height: 140 });
     const funding = createChart(fundingRef.current!, { ...baseOptions, height: 120 });
-    const charts: IChartApi[] = [price, regime, rsi, macd, adx, funding];
+    charts.push(price, regime, rsi, macd, adx, funding);
 
     // --- price: candles + volume + Bollinger + MAs ---
     const candles = price.addCandlestickSeries({
@@ -120,6 +122,11 @@ export function Dashboard({ data }: { data: ChartResponse }) {
       unsub.forEach((fn) => fn());
       charts.forEach((c) => c.remove());
     };
+    } catch (e) {
+      console.error("[charts] render failed:", e);
+      charts.forEach((c) => { try { c.remove(); } catch { /* noop */ } });
+      return () => {};
+    }
   }, [data]);
 
   const Pane = ({ title, legend, inner }: { title: string; legend?: ReactNode; inner: RefObject<HTMLDivElement> }) => (
