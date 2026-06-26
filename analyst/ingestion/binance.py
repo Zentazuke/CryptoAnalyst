@@ -181,6 +181,36 @@ class BinanceSource:
             return vals, {"fundingRate": raw}
         raise BinanceError(f"unsupported valuation_type {valuation_type!r}")
 
+    def fetch_top_symbols(self, quote: str = "USDT", limit: int = 30) -> list[str]:
+        """Top spot symbols by 24h quote volume (excludes stables + leveraged tokens)."""
+        stable_bases = {"USDC", "FDUSD", "TUSD", "USDP", "DAI", "BUSD", "EUR", "GBP", "AEUR"}
+        lev = ("UPUSDT", "DOWNUSDT", "BULLUSDT", "BEARUSDT")
+        data = self._get(SPOT_BASE, "/api/v3/ticker/24hr", {})
+        rows = []
+        for t in data:
+            s = t.get("symbol", "")
+            if not s.endswith(quote) or s.endswith(lev):
+                continue
+            base = s[: -len(quote)]
+            if base in stable_bases or base.startswith("USD"):  # USD1, USDC, ...
+                continue
+            try:
+                rows.append((s, float(t["quoteVolume"])))
+            except (KeyError, ValueError):
+                continue
+        rows.sort(key=lambda r: r[1], reverse=True)
+        return [s for s, _ in rows[:limit]]
+
+    def fetch_all_funding(self) -> dict[str, float]:
+        """Current funding rate for every USDⓈ-M perp, keyed by symbol."""
+        out: dict[str, float] = {}
+        for x in self._get(FUT_BASE, "/fapi/v1/premiumIndex", {}):
+            try:
+                out[x["symbol"]] = float(x["lastFundingRate"])
+            except (KeyError, ValueError, TypeError):
+                continue
+        return out
+
     def fetch_funding_history(
         self, perp: str, total: int, page: int = 1000, pause: float = 0.1
     ) -> tuple[list[dict], list[dict]]:

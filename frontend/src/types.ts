@@ -74,6 +74,37 @@ export interface Commentary {
   caveat: string;
 }
 
+export interface ScanRow {
+  rank: number;
+  symbol: string;
+  instrument: string;
+  price: number;
+  regime: string;
+  confidence: number;
+  rsi: number | null;
+  adx: number | null;
+  above_ema: boolean;
+  momentum: number;
+  funding: number | null;
+}
+
+export interface ScanResponse {
+  timeframe: string;
+  lookback: number;
+  count: number;
+  rows: ScanRow[];
+  aggregates: {
+    regime_counts: Record<string, number>;
+    pct_uptrend: number;
+    pct_downtrend: number;
+    pct_above_ema20: number;
+    avg_funding: number | null;
+    breadth: string;
+  };
+  setups: { symbol: string; kind: string; note: string }[];
+  cached?: boolean;
+}
+
 export interface Sentiment {
   symbol: string;
   available: boolean;

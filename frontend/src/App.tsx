@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { fetchChart, fetchMicro, fetchCommentary, fetchSentiment, API_BASE } from "./api";
-import type { ChartResponse, Commentary, MicroSnapshot, Sentiment } from "./types";
+import { fetchChart, fetchMicro, fetchCommentary, fetchSentiment, fetchScan, API_BASE } from "./api";
+import type { ChartResponse, Commentary, MicroSnapshot, ScanResponse, Sentiment } from "./types";
 import { Controls } from "./components/Controls";
 import { TrustBar } from "./components/TrustBar";
 import { Dashboard } from "./components/Dashboard";
@@ -8,6 +8,7 @@ import { RegimeCard } from "./components/RegimeCard";
 import { MicrostructureCard } from "./components/MicrostructureCard";
 import { CommentaryCard } from "./components/CommentaryCard";
 import { SentimentCard } from "./components/SentimentCard";
+import { MarketScanCard } from "./components/MarketScanCard";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
 const SYMBOLS = ["BTC_USDT", "ETH_USDT"];
@@ -23,6 +24,15 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [auto, setAuto] = useState(false);
+  const [scan, setScan] = useState<ScanResponse | null>(null);
+  const [scanLoading, setScanLoading] = useState(false);
+
+  const loadScan = useCallback(() => {
+    setScanLoading(true);
+    fetchScan("4h", 24)
+      .then(setScan)
+      .finally(() => setScanLoading(false));
+  }, []);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -50,6 +60,10 @@ export default function App() {
     load();
   }, [load]);
 
+  useEffect(() => {
+    loadScan();
+  }, [loadScan]);
+
   // real-time feel: poll while auto-refresh is on
   useEffect(() => {
     if (!auto) return;
@@ -75,6 +89,10 @@ export default function App() {
           onAuto={setAuto}
         />
       </header>
+
+      <ErrorBoundary name="Market scan">
+        <MarketScanCard scan={scan} loading={scanLoading} onRefresh={loadScan} />
+      </ErrorBoundary>
 
       {data && <TrustBar data={data} timeframe={timeframe} />}
 

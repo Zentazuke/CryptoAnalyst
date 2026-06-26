@@ -1,4 +1,4 @@
-import type { ChartResponse, Commentary, MicroSnapshot, Sentiment } from "./types";
+import type { ChartResponse, Commentary, MicroSnapshot, ScanResponse, Sentiment } from "./types";
 
 // Same-origin: the dev server proxies "/api" -> the analyst API (see
 // vite.config.ts). This sidesteps browser CORS and IPv4/IPv6 loopback issues.
@@ -63,6 +63,14 @@ export async function fetchCommentary(symbol: string, timeframe: string): Promis
 export async function fetchSentiment(symbol: string): Promise<Sentiment | null> {
   try {
     return await getJSON<Sentiment>(`/sentiment/${encodeURIComponent(symbol)}`);
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchScan(timeframe = "4h", limit = 24): Promise<ScanResponse | null> {
+  try {
+    return await getJSON<ScanResponse>(`/scan?timeframe=${encodeURIComponent(timeframe)}&limit=${limit}`);
   } catch {
     return null;
   }

@@ -12,6 +12,7 @@ A read-only DuckDB connection is opened for the app's lifetime. Run with:
 from __future__ import annotations
 
 import math
+import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Query
@@ -19,7 +20,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from analyst.commentary import generate_commentary
 from analyst.config import DB_PATH, DEFAULT_TIMEFRAME
+from analyst.ingestion import make_source
 from analyst.ingestion.sentiment import SentimentClient
+from analyst.scanner import scan_symbols
 from analyst.features import compute_indicators, snapshot
 from analyst.features.engine import INDICATOR_VERSION
 from analyst.regime import calibrate, classify_latest, classify_series
@@ -171,6 +174,34 @@ def regime_calibration(
         raise HTTPException(status_code=404, detail=f"no {timeframe} data for {symbol}")
     report = calibrate(rows, params={"horizon": horizon})
     return {"symbol": symbol, "timeframe": timeframe, **report}
+
+
+_scan_cache: dict[tuple, tuple[float, dict]] = {}
+
+
+@app.get("/scan")
+def scan(
+    timeframe: str = Query(default="4h"),
+    limit: int = Query(default=24, ge=4, le=60),
+) -> dict:
+    """Cross-asset market scan: per-coin regime + relative strength + funding."""
+    key = (timeframe, limit)
+    now = time.time()
+    cached = _scan_cache.get(key)
+    if cached and now - cached[0] < 300:  # 5-min cache (the sweep is heavy)
+        return {**cached[1], "cached": True}
+
+    source = make_source()
+    if not hasattr(source, "fetch_top_symbols"):
+        raise HTTPException(status_code=501, detail="scan requires the Binance source")
+    try:
+        symbols = source.fetch_top_symbols(limit=limit)
+        result = scan_symbols(source, symbols, timeframe=timeframe)
+    finally:
+        if hasattr(source, "close"):
+            source.close()
+    _scan_cache[key] = (now, result)
+    return {**result, "cached": False}
 
 
 @app.get("/sentiment/{symbol}")
