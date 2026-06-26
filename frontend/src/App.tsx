@@ -80,7 +80,7 @@ export default function App() {
         <Controls
           symbol={symbol}
           timeframe={timeframe}
-          symbols={SYMBOLS}
+          symbols={Array.from(new Set([...SYMBOLS, symbol]))}
           timeframes={TIMEFRAMES}
           onSymbol={setSymbol}
           onTimeframe={setTimeframe}
@@ -91,7 +91,12 @@ export default function App() {
       </header>
 
       <ErrorBoundary name="Market scan">
-        <MarketScanCard scan={scan} loading={scanLoading} onRefresh={loadScan} />
+        <MarketScanCard
+          scan={scan}
+          loading={scanLoading}
+          onRefresh={loadScan}
+          onPick={(inst) => setSymbol(inst.endsWith("USDT") ? `${inst.slice(0, -4)}_USDT` : inst)}
+        />
       </ErrorBoundary>
 
       {data && <TrustBar data={data} timeframe={timeframe} />}

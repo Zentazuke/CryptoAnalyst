@@ -61,6 +61,43 @@ def store() -> Store:
     return _store
 
 
+_live_cache: dict[tuple, tuple[float, list[dict]]] = {}
+
+
+def _load_candles(symbol: str, timeframe: str, live_count: int = 1000) -> list[dict]:
+    """Candles for a symbol: from the store if ingested, else fetched live.
+
+    Lets the analyst cover any coin on demand (e.g. clicked from the scanner),
+    not just the pre-ingested BTC/ETH. Live results are cached briefly.
+    """
+    rows = store().get_candles(symbol, timeframe)
+    if rows:
+        return rows
+
+    key = (symbol, timeframe, live_count)
+    now = time.time()
+    cached = _live_cache.get(key)
+    if cached and now - cached[0] < 60:
+        return cached[1]
+
+    src = make_source()
+    try:
+        candles, _ = src.fetch_ohlcv(symbol, timeframe, count=min(live_count, 1000))
+    except Exception:
+        candles = []
+    finally:
+        if hasattr(src, "close"):
+            src.close()
+    rows = [
+        {"symbol": symbol, "timeframe": timeframe, "ts": c.ts,
+         "open": c.open, "high": c.high, "low": c.low, "close": c.close,
+         "volume": c.volume, "source": c.source, "ingest_ts": c.ingest_ts}
+        for c in candles
+    ]
+    _live_cache[key] = (now, rows)
+    return rows
+
+
 @app.get("/health")
 def health() -> dict:
     s = store()
@@ -117,7 +154,7 @@ def indicators(
     timeframe: str = Query(default=DEFAULT_TIMEFRAME),
 ) -> dict:
     """Latest technical-indicator snapshot computed from stored candles."""
-    rows = store().get_candles(symbol, timeframe)
+    rows = _load_candles(symbol, timeframe)
     if not rows:
         raise HTTPException(status_code=404, detail=f"no {timeframe} data for {symbol}")
     snap = snapshot(rows)
@@ -149,7 +186,7 @@ def regime(
     limit: int = Query(default=1, ge=1, le=2000),
 ) -> dict:
     """Current (or recent) regime call(s) with confidence and reasons."""
-    rows = store().get_candles(symbol, timeframe)
+    rows = _load_candles(symbol, timeframe)
     if not rows:
         raise HTTPException(status_code=404, detail=f"no {timeframe} data for {symbol}")
     results = classify_series(rows)
@@ -169,7 +206,7 @@ def regime_calibration(
     horizon: int = Query(default=12, ge=1, le=200),
 ) -> dict:
     """Backtest the classifier's calls vs forward outcomes (measured accuracy)."""
-    rows = store().get_candles(symbol, timeframe)
+    rows = _load_candles(symbol, timeframe)
     if not rows:
         raise HTTPException(status_code=404, detail=f"no {timeframe} data for {symbol}")
     report = calibrate(rows, params={"horizon": horizon})
@@ -220,7 +257,7 @@ def commentary(
     timeframe: str = Query(default=DEFAULT_TIMEFRAME),
 ) -> dict:
     """A written analyst note: what's happening, what it means, and an outlook."""
-    rows = store().get_candles(symbol, timeframe)
+    rows = _load_candles(symbol, timeframe)
     if not rows:
         raise HTTPException(status_code=404, detail=f"no {timeframe} data for {symbol}")
     micro_rows = store().get_micro(symbol, limit=1)
@@ -256,7 +293,7 @@ def chart(
     truth); the client never recomputes technical analysis itself. Times are
     UTC seconds, as expected by lightweight-charts.
     """
-    rows = store().get_candles(symbol, timeframe, limit=limit)
+    rows = _load_candles(symbol, timeframe, live_count=limit)[-limit:]
     if not rows:
         raise HTTPException(status_code=404, detail=f"no {timeframe} data for {symbol}")
 
