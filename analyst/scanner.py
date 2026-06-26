@@ -53,6 +53,11 @@ def scan_symbols(
             "funding": funding.get(sym),
         })
 
+    # relative strength vs BTC (rotation)
+    btc_mom = next((r["momentum"] for r in rows if r["instrument"] == "BTCUSDT"), None)
+    for r in rows:
+        r["rs_vs_btc"] = round(r["momentum"] - btc_mom, 4) if btc_mom is not None else None
+
     rows.sort(key=lambda r: r["momentum"] if r["momentum"] is not None else -9, reverse=True)
     for i, r in enumerate(rows):
         r["rank"] = i + 1
@@ -76,6 +81,12 @@ def _aggregate(rows: list[dict]) -> dict:
     down = counts.get(C.TREND_DOWN, 0)
     above = sum(1 for r in rows if r["above_ema"])
     fundings = [r["funding"] for r in rows if r["funding"] is not None]
+    rs = [r["rs_vs_btc"] for r in rows if r.get("rs_vs_btc") is not None and r["instrument"] != "BTCUSDT"]
+    outperf = sum(1 for v in rs if v > 0)
+    rotation = None
+    if rs:
+        frac = outperf / len(rs)
+        rotation = "alts outperforming BTC" if frac > 0.55 else "BTC leading" if frac < 0.45 else "mixed"
     return {
         "regime_counts": counts,
         "pct_uptrend": round(up / n, 3),
@@ -83,6 +94,8 @@ def _aggregate(rows: list[dict]) -> dict:
         "pct_above_ema20": round(above / n, 3),
         "avg_funding": round(sum(fundings) / len(fundings), 6) if fundings else None,
         "breadth": "risk-on" if up > down else "risk-off" if down > up else "mixed",
+        "rotation": rotation,
+        "pct_outperform_btc": round(outperf / len(rs), 3) if rs else None,
     }
 
 

@@ -120,6 +120,7 @@ export interface ScanRow {
   above_ema: boolean;
   momentum: number;
   funding: number | null;
+  rs_vs_btc: number | null;
 }
 
 export interface ScanResponse {
@@ -134,6 +135,8 @@ export interface ScanResponse {
     pct_above_ema20: number;
     avg_funding: number | null;
     breadth: string;
+    rotation: string | null;
+    pct_outperform_btc: number | null;
   };
   setups: { symbol: string; kind: string; note: string }[];
   cached?: boolean;

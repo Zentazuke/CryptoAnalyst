@@ -39,6 +39,11 @@ export function MarketScanCard({
             {scan.aggregates.avg_funding != null && (
               <span className="muted-txt">· avg funding {fund(scan.aggregates.avg_funding)}</span>
             )}
+            {scan.aggregates.rotation && (
+              <span className="badge" style={{ background: "rgba(88,166,255,0.12)", color: "#58a6ff" }}>
+                {scan.aggregates.rotation}
+              </span>
+            )}
           </div>
 
           {scan.setups.length > 0 && (
@@ -54,7 +59,7 @@ export function MarketScanCard({
           <div className="scan-table-wrap">
             <table className="scan-table">
               <thead>
-                <tr><th>#</th><th>Coin</th><th>Regime</th><th className="r">Mom.</th><th className="r">RSI</th><th className="r">ADX</th><th className="r">Funding</th></tr>
+                <tr><th>#</th><th>Coin</th><th>Regime</th><th className="r">Mom.</th><th className="r">vs BTC</th><th className="r">RSI</th><th className="r">ADX</th><th className="r">Funding</th></tr>
               </thead>
               <tbody>
                 {scan.rows.slice(0, 18).map((r) => (
@@ -63,6 +68,7 @@ export function MarketScanCard({
                     <td><b>{r.symbol}</b></td>
                     <td style={{ color: regimeColor(r.regime) }}>{regimeLabel(r.regime)}</td>
                     <td className="r" style={{ color: momColor(r.momentum) }}>{r.momentum >= 0 ? "+" : ""}{(r.momentum * 100).toFixed(1)}%</td>
+                    <td className="r" style={{ color: r.rs_vs_btc == null ? undefined : momColor(r.rs_vs_btc) }}>{r.rs_vs_btc == null ? "—" : `${r.rs_vs_btc >= 0 ? "+" : ""}${(r.rs_vs_btc * 100).toFixed(1)}%`}</td>
                     <td className="r">{r.rsi != null ? r.rsi.toFixed(0) : "—"}</td>
                     <td className="r">{r.adx != null ? r.adx.toFixed(0) : "—"}</td>
                     <td className="r" style={{ color: r.funding == null ? undefined : r.funding > 0 ? "#3fb950" : "#f85149" }}>{fund(r.funding)}</td>
