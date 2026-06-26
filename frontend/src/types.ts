@@ -88,6 +88,7 @@ export interface RiskFrame {
   bandwidth_pct: number | null;
   long: { stop: number; target: number | null; rr: number | null };
   short: { stop: number; target: number | null; rr: number | null };
+  implied_vol?: { dvol: number; realized_vol_annual: number; premium_pts: number; signal: string } | null;
 }
 
 export interface Commentary {

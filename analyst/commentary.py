@@ -129,7 +129,7 @@ def generate_commentary(
     funding_rows: list[dict] | None = None,
     positioning: dict | None = None, derivatives: dict | None = None,
     htf: dict | None = None, outlook_calibration: dict | None = None,
-    onchain: dict | None = None,
+    onchain: dict | None = None, vol_iv: dict | None = None,
 ) -> dict:
     if len(candles) < 60:
         return {
@@ -377,6 +377,16 @@ def generate_commentary(
         )
         if risk["vol_regime"] == "compressed":
             meaning.append("Compressed volatility often precedes an expansion — be ready for a larger move (direction unconfirmed).")
+        if vol_iv:
+            happening.append(
+                f"Implied vol (DVOL) {vol_iv['dvol']:.0f}% vs realized {vol_iv['realized_vol_annual']:.0f}% "
+                f"→ {vol_iv['premium_pts']:+.0f}pts ({vol_iv['signal']})."
+            )
+            if vol_iv["signal"] == "premium":
+                meaning.append("Options are pricing more risk than has occurred — demand for protection / fear is elevated.")
+            elif vol_iv["signal"] == "discount":
+                meaning.append("Options look cheap vs realized volatility — complacency, or a window for cheap optionality.")
+            risk["implied_vol"] = vol_iv
         # reward-to-level in ATR units, for the side that matches the lean
         side = risk["long"] if tech_bias == "bullish" else risk["short"] if tech_bias == "bearish" else None
         if side and side.get("rr") is not None and side.get("target") is not None:

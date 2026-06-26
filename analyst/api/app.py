@@ -29,6 +29,7 @@ from analyst.alerts import detect_alerts
 from analyst.microstructure import compute_microstructure
 from analyst.onchain import onchain_snapshot
 from analyst.scanner import scan_symbols
+from analyst.vol import implied_vol_context
 
 HIGHER_TF ={"1m": "15m", "5m": "1h", "15m": "1h", "30m": "4h", "1h": "4h", "4h": "1D", "12h": "1D", "1D": "7D"}
 from analyst.features import compute_indicators, snapshot
@@ -465,6 +466,7 @@ def commentary(
         rows, timeframe, micro=micro, sentiment=sentiment_bundle, funding_rows=funding_rows,
         positioning=positioning, derivatives=derivatives, htf=htf, outlook_calibration=outlook_cal,
         onchain=_load_onchain(symbol),
+        vol_iv=_cached(("iv", symbol, timeframe), 600, lambda: implied_vol_context(symbol, rows, timeframe)),
     )
     return {"symbol": symbol, "timeframe": timeframe, "as_of": ms_to_iso(rows[-1]["ts"]), **note}
 

@@ -72,6 +72,14 @@ export function CommentaryCard({ note }: { note: Commentary }) {
             <span className="risk-k">R to support</span>
             <span className="risk-v" style={{ color: "#f85149" }}>{note.risk.short.rr != null ? `${note.risk.short.rr.toFixed(1)}R` : "—"}</span>
           </span>
+          {note.risk.implied_vol && (
+            <span className="risk-item" title={`realized ${note.risk.implied_vol.realized_vol_annual.toFixed(0)}%`}>
+              <span className="risk-k">Implied vol (DVOL)</span>
+              <span className="risk-v" style={{ color: note.risk.implied_vol.signal === "premium" ? "#f0883e" : note.risk.implied_vol.signal === "discount" ? "#3fb950" : undefined }}>
+                {note.risk.implied_vol.dvol.toFixed(0)}% ({note.risk.implied_vol.premium_pts >= 0 ? "+" : ""}{note.risk.implied_vol.premium_pts.toFixed(0)})
+              </span>
+            </span>
+          )}
         </div>
       )}
 
