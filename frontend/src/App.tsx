@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { fetchChart, fetchMicro, fetchCommentary, fetchSentiment, fetchScan, fetchOnchain, fetchAlerts, API_BASE } from "./api";
-import type { AlertsResponse, ChartResponse, Commentary, MicroSnapshot, OnChain, ScanResponse, Sentiment } from "./types";
+import { fetchChart, fetchMicro, fetchCommentary, fetchSentiment, fetchScan, fetchOnchain, fetchAlerts, fetchAlertJournal, API_BASE } from "./api";
+import type { AlertJournalResponse, AlertsResponse, ChartResponse, Commentary, MicroSnapshot, OnChain, ScanResponse, Sentiment } from "./types";
 import { Controls } from "./components/Controls";
 import { TrustBar } from "./components/TrustBar";
+import { Section } from "./components/Section";
 import { Dashboard } from "./components/Dashboard";
 import { RegimeCard } from "./components/RegimeCard";
 import { MicrostructureCard } from "./components/MicrostructureCard";
@@ -10,6 +11,7 @@ import { CommentaryCard } from "./components/CommentaryCard";
 import { SentimentCard } from "./components/SentimentCard";
 import { MarketScanCard } from "./components/MarketScanCard";
 import { AlertsCard } from "./components/AlertsCard";
+import { AlertJournalCard } from "./components/AlertJournalCard";
 import { OnChainCard } from "./components/OnChainCard";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
@@ -29,14 +31,16 @@ export default function App() {
   const [auto, setAuto] = useState(false);
   const [scan, setScan] = useState<ScanResponse | null>(null);
   const [alerts, setAlerts] = useState<AlertsResponse | null>(null);
+  const [journal, setJournal] = useState<AlertJournalResponse | null>(null);
   const [scanLoading, setScanLoading] = useState(false);
 
   const loadScan = useCallback(() => {
     setScanLoading(true);
-    Promise.all([fetchScan("4h", 24), fetchAlerts("4h", 24)])
-      .then(([sc, al]) => {
+    Promise.all([fetchScan("4h", 24), fetchAlerts("4h", 24), fetchAlertJournal(40)])
+      .then(([sc, al, jr]) => {
         setScan(sc);
         setAlerts(al);
+        setJournal(jr);
       })
       .finally(() => setScanLoading(false));
   }, []);
@@ -102,47 +106,13 @@ export default function App() {
         />
       </header>
 
-      <ErrorBoundary name="Market scan">
-        <MarketScanCard
-          scan={scan}
-          loading={scanLoading}
-          onRefresh={loadScan}
-          onPick={pickInstrument}
-        />
-      </ErrorBoundary>
-
-      <ErrorBoundary name="Alerts">
-        <AlertsCard data={alerts} onPick={pickInstrument} />
-      </ErrorBoundary>
-
+      {/* ── The synthesized read, up top: everything condensed and analysed ── */}
       {data && <TrustBar data={data} timeframe={timeframe} />}
 
       {note && (
         <ErrorBoundary name="Analyst note">
           <CommentaryCard note={note} />
         </ErrorBoundary>
-      )}
-
-      {data && (
-        <div className="cards-row">
-          <ErrorBoundary name="Regime card">
-            <RegimeCard regime={data.regime_current} timeframe={timeframe} />
-          </ErrorBoundary>
-          <ErrorBoundary name="Microstructure card">
-            <MicrostructureCard micro={micro} />
-          </ErrorBoundary>
-        </div>
-      )}
-
-      {data && (
-        <div className="cards-row">
-          <ErrorBoundary name="Sentiment card">
-            <SentimentCard sentiment={sentiment} />
-          </ErrorBoundary>
-          <ErrorBoundary name="On-chain card">
-            <OnChainCard onchain={onchain} />
-          </ErrorBoundary>
-        </div>
       )}
 
       {loading && <div className="status">Loading {symbol} {timeframe}…</div>}
@@ -158,11 +128,54 @@ export default function App() {
         </div>
       )}
 
-      {!loading && !error && data && (
-        <ErrorBoundary name="Charts">
-          <Dashboard data={data} />
-        </ErrorBoundary>
+      {/* ── Then we break it apart: the evidence behind the read ── */}
+      {data && (
+        <Section title="Evidence" subtitle="regime · microstructure · sentiment · on-chain">
+          <div className="cards-row">
+            <ErrorBoundary name="Regime card">
+              <RegimeCard regime={data.regime_current} timeframe={timeframe} />
+            </ErrorBoundary>
+            <ErrorBoundary name="Microstructure card">
+              <MicrostructureCard micro={micro} />
+            </ErrorBoundary>
+          </div>
+          <div className="cards-row">
+            <ErrorBoundary name="Sentiment card">
+              <SentimentCard sentiment={sentiment} />
+            </ErrorBoundary>
+            <ErrorBoundary name="On-chain card">
+              <OnChainCard onchain={onchain} />
+            </ErrorBoundary>
+          </div>
+        </Section>
       )}
+
+      {!loading && !error && data && (
+        <Section title="Charts" subtitle="price, levels & indicator panes">
+          <ErrorBoundary name="Charts">
+            <Dashboard data={data} />
+          </ErrorBoundary>
+        </Section>
+      )}
+
+      <Section title="Market scan & alerts" subtitle="breadth, live setups & fired-alert track record">
+        <ErrorBoundary name="Market scan">
+          <MarketScanCard
+            scan={scan}
+            loading={scanLoading}
+            onRefresh={loadScan}
+            onPick={pickInstrument}
+          />
+        </ErrorBoundary>
+        <div className="cards-row">
+          <ErrorBoundary name="Alerts">
+            <AlertsCard data={alerts} onPick={pickInstrument} />
+          </ErrorBoundary>
+          <ErrorBoundary name="Alert journal">
+            <AlertJournalCard data={journal} onPick={pickInstrument} />
+          </ErrorBoundary>
+        </div>
+      </Section>
 
       <p className="footnote">
         All indicators and the regime call are computed by the Python engine (single source of

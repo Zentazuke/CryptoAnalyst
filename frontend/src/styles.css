@@ -100,6 +100,23 @@ header.app-head {
 .dot.bad { background: var(--bad); }
 .dot.warn { background: var(--warn); }
 
+/* Collapsible sections — break the read apart into readable zones */
+.section { margin-bottom: 18px; }
+.section-head {
+  display: flex; align-items: baseline; gap: 10px; width: 100%;
+  background: none; border: none; border-bottom: 1px solid var(--border);
+  color: var(--text); padding: 4px 2px 8px; margin-bottom: 14px;
+  cursor: pointer; text-align: left;
+}
+.section-head:hover .section-title { color: var(--accent); }
+.section-chevron { color: var(--muted); font-size: 11px; width: 14px; }
+.section-title { font-size: 13px; font-weight: 650; text-transform: uppercase; letter-spacing: 0.6px; }
+.section-sub { color: var(--muted); font-size: 12px; font-weight: 400; }
+.section-body { }
+
+/* Alert journal: timestamp column */
+.journal-when { font-size: 11px; width: 96px; flex: none; }
+
 /* Charts */
 .chart-card {
   background: var(--panel);

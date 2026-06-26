@@ -159,6 +159,25 @@ export interface AlertsResponse {
   alerts: Alert[];
 }
 
+export interface AlertJournalEntry {
+  fired_ts: number;
+  fired_at: string;
+  symbol: string;
+  kind: string;
+  direction: string;
+  severity: number;
+  timeframe: string;
+  price_at_fire: number;
+  since_ret: number | null;
+  on_track: boolean | null;
+}
+
+export interface AlertJournalResponse {
+  count: number;
+  on_track_rate: number | null;
+  alerts: AlertJournalEntry[];
+}
+
 export interface Sentiment {
   symbol: string;
   available: boolean;
