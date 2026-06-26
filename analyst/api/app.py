@@ -22,6 +22,7 @@ from analyst.commentary import generate_commentary
 from analyst.config import DB_PATH, DEFAULT_TIMEFRAME
 from analyst.ingestion import make_source
 from analyst.ingestion.sentiment import SentimentClient
+from analyst.microstructure import compute_microstructure
 from analyst.scanner import scan_symbols
 from analyst.features import compute_indicators, snapshot
 from analyst.features.engine import INDICATOR_VERSION
@@ -98,6 +99,81 @@ def _load_candles(symbol: str, timeframe: str, live_count: int = 1000) -> list[d
     return rows
 
 
+_aux_cache: dict[tuple, tuple[float, Any]] = {}
+
+
+def _cached(key: tuple, ttl: float, producer):
+    """Tiny TTL memo for live aux fetches (funding/micro/positioning)."""
+    now = time.time()
+    hit = _aux_cache.get(key)
+    if hit and now - hit[0] < ttl:
+        return hit[1]
+    value = producer()
+    _aux_cache[key] = (now, value)
+    return value
+
+
+def _load_funding(symbol: str) -> list[dict]:
+    """Funding history: stored if present, else live-fetched from the venue."""
+    rows = store().get_funding(symbol)
+    if rows:
+        return rows
+
+    def fetch():
+        src = make_source()
+        try:
+            perp = src.perp_for(symbol) if hasattr(src, "perp_for") else None
+            if perp and hasattr(src, "fetch_funding_history"):
+                hist, _ = src.fetch_funding_history(perp, total=1000)
+                return hist
+        except Exception:
+            pass
+        finally:
+            if hasattr(src, "close"):
+                src.close()
+        return []
+
+    return _cached(("funding", symbol), 600, fetch)
+
+
+def _load_micro(symbol: str) -> dict | None:
+    """Latest microstructure: stored if present, else computed live (not stored)."""
+    rows = store().get_micro(symbol, limit=1)
+    if rows:
+        return rows[0]
+
+    def fetch():
+        src = make_source()
+        try:
+            snap, _ = compute_microstructure(symbol, src)
+            d = snap.model_dump()
+            d["snapshot_time"] = ms_to_iso(snap.ts)
+            d["live"] = True
+            return d
+        except Exception:
+            return None
+        finally:
+            if hasattr(src, "close"):
+                src.close()
+
+    return _cached(("micro", symbol), 30, fetch)
+
+
+def _live_positioning(symbol: str) -> dict | None:
+    """Live crowd long/short ratio for the native crowd read (any coin)."""
+    def fetch():
+        src = make_source()
+        try:
+            return src.fetch_lsr(symbol) if hasattr(src, "fetch_lsr") else None
+        except Exception:
+            return None
+        finally:
+            if hasattr(src, "close"):
+                src.close()
+
+    return _cached(("lsr", symbol), 120, fetch)
+
+
 @app.get("/health")
 def health() -> dict:
     s = store()
@@ -170,6 +246,9 @@ def microstructure(
     """Latest (or recent) market-microstructure snapshot(s) for a symbol."""
     rows = store().get_micro(symbol, limit=limit)
     if not rows:
+        live = _load_micro(symbol)  # compute one live (e.g. a coin clicked from the scan)
+        if live:
+            return {"symbol": symbol, "count": 1, "snapshots": [live]}
         raise HTTPException(
             status_code=404,
             detail=f"no microstructure for {symbol} — run `python -m analyst.collect_micro`",
@@ -260,13 +339,20 @@ def commentary(
     rows = _load_candles(symbol, timeframe)
     if not rows:
         raise HTTPException(status_code=404, detail=f"no {timeframe} data for {symbol}")
-    micro_rows = store().get_micro(symbol, limit=1)
-    micro = micro_rows[0] if micro_rows else None
+    micro = _load_micro(symbol)
     with SentimentClient() as sc:
         sentiment_bundle = sc.bundle(symbol)
-    funding_rows = store().get_funding(symbol)
+    funding_rows = _load_funding(symbol)
+
+    # crowd inputs: prefer the sentiment engine; else native (live LSR + funding)
+    positioning = (sentiment_bundle.get("positioning") if sentiment_bundle else None) or _live_positioning(symbol)
+    derivatives = sentiment_bundle.get("derivatives") if sentiment_bundle else None
+    if not derivatives and micro and micro.get("funding_rate") is not None:
+        derivatives = {"funding_rate": micro["funding_rate"], "open_interest_usd": micro.get("open_interest")}
+
     note = generate_commentary(
-        rows, timeframe, micro=micro, sentiment=sentiment_bundle, funding_rows=funding_rows
+        rows, timeframe, micro=micro, sentiment=sentiment_bundle, funding_rows=funding_rows,
+        positioning=positioning, derivatives=derivatives,
     )
     return {"symbol": symbol, "timeframe": timeframe, "as_of": ms_to_iso(rows[-1]["ts"]), **note}
 
@@ -321,8 +407,8 @@ def chart(
         )
     }
 
-    # aligned funding series (causal forward-fill), if funding history exists
-    funding_rows = store().get_funding(symbol)
+    # aligned funding series (causal forward-fill); stored or live-fetched
+    funding_rows = _load_funding(symbol)
     if funding_rows:
         aligned = align_funding([r["ts"] for r in rows], funding_rows)
         panels["funding"] = [

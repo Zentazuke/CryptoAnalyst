@@ -201,6 +201,20 @@ class BinanceSource:
         rows.sort(key=lambda r: r[1], reverse=True)
         return [s for s, _ in rows[:limit]]
 
+    def fetch_lsr(self, symbol: str, period: str = "5m") -> dict | None:
+        """Latest crowd global long/short account ratio for a perp, or None."""
+        try:
+            data = self._get(
+                FUT_BASE, "/futures/data/globalLongShortAccountRatio",
+                {"symbol": self._sym(symbol), "period": period, "limit": 1},
+            )
+        except Exception:
+            return None
+        if not data:
+            return None
+        x = data[-1]
+        return {"global_account_ratio": float(x["longShortRatio"]), "timestamp": int(x["timestamp"])}
+
     def fetch_all_funding(self) -> dict[str, float]:
         """Current funding rate for every USDⓈ-M perp, keyed by symbol."""
         out: dict[str, float] = {}

@@ -5,4 +5,7 @@ from analyst.microstructure.compute import (  # noqa: F401
     mid_price,
     spread_bps,
 )
-from analyst.microstructure.collect import collect_microstructure  # noqa: F401
+from analyst.microstructure.collect import (  # noqa: F401
+    collect_microstructure,
+    compute_microstructure,
+)

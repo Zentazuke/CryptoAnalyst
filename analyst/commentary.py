@@ -90,7 +90,8 @@ def _crowd_read(pos: dict | None, dv: dict | None) -> dict | None:
     if not facts:
         return None
 
-    detail = ", ".join(facts) + (f"; engine signal: {sig}" if sig else "")
+    sig_txt = f"; signal {sig:.2f}" if isinstance(sig, (int, float)) else (f"; signal {sig}" if sig else "")
+    detail = ", ".join(facts) + sig_txt
     if long_c and not short_c:
         return {
             "happening": f"Crowd is leaning long ({detail}).",
@@ -124,6 +125,7 @@ def generate_commentary(
     candles: list[Any], timeframe: str, micro: dict | None = None,
     horizon: int | None = None, sentiment: dict | None = None,
     funding_rows: list[dict] | None = None,
+    positioning: dict | None = None, derivatives: dict | None = None,
 ) -> dict:
     if len(candles) < 60:
         return {
@@ -214,22 +216,24 @@ def generate_commentary(
         if sp is not None and sp > 3:
             happening.append(f"Top-of-book spread is wide ({sp:.1f} bps) — thinner liquidity, more slippage risk.")
 
-    # --- sentiment & context (from the sentiment engine, if available) ---
+    # --- crowd positioning (native or engine-sourced; works for any coin) ---
     sent_bias = None
-    crowd = None
     crowd_cal = calibrate_funding_contrarian(candles, funding_rows, horizon) if funding_rows else None
-    if sentiment:
-        crowd = _crowd_read(sentiment.get("positioning"), sentiment.get("derivatives"))
-        if crowd:
-            happening.append(crowd["happening"])
-            if crowd["meaning"]:
-                meaning.append(crowd["meaning"])
-            if crowd_cal and crowd_cal.get("lift") is not None:
-                meaning.append(
-                    f"Measured: funding-crowding has been contrarian {crowd_cal['hit_rate'] * 100:.0f}% "
-                    f"of the time vs a {crowd_cal['base_rate'] * 100:.0f}% base "
-                    f"(lift {crowd_cal['lift']:.2f}x, n={crowd_cal['count']} over ~{crowd_cal['span_days']:.0f}d)."
-                )
+    pos = positioning or (sentiment.get("positioning") if sentiment else None)
+    dv = derivatives or (sentiment.get("derivatives") if sentiment else None)
+    crowd = _crowd_read(pos, dv) if (pos or dv) else None
+    if crowd:
+        happening.append(crowd["happening"])
+        if crowd["meaning"]:
+            meaning.append(crowd["meaning"])
+        if crowd_cal and crowd_cal.get("lift") is not None:
+            meaning.append(
+                f"Measured: funding-crowding has been contrarian {crowd_cal['hit_rate'] * 100:.0f}% "
+                f"of the time vs a {crowd_cal['base_rate'] * 100:.0f}% base "
+                f"(lift {crowd_cal['lift']:.2f}x, n={crowd_cal['count']} over ~{crowd_cal['span_days']:.0f}d)."
+            )
+
+    # --- sentiment & context (from the sentiment engine, if available) ---
     if sentiment and sentiment.get("outlook"):
         ol = sentiment["outlook"]
         label = ol.get("label")
