@@ -14,14 +14,18 @@ def detect_alerts(rows: list[dict], *, mom_thr: float = 0.03, funding_extreme: f
     """Return confluence setups, ranked by corroborating-signal count (severity)."""
     alerts: list[dict] = []
 
+    price_by_sym: dict[str, float] = {}
+
     def add(sym, kind, direction, signals, note, boost=0):
         alerts.append({
             "symbol": sym, "kind": kind, "direction": direction,
             "severity": len(signals) + boost, "signals": signals, "note": note,
+            "price": price_by_sym.get(sym),
         })
 
     for r in rows:
         sym, regime = r["symbol"], r["regime"]
+        price_by_sym[sym] = r.get("price")
         rsi, funding = r.get("rsi"), r.get("funding")
         mom = r.get("momentum") or 0.0
         above, _ = r.get("above_ema"), r.get("adx")

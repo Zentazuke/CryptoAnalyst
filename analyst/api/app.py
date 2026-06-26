@@ -19,7 +19,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from analyst.commentary import DEFAULT_HORIZON, generate_commentary
-from analyst.config import DB_PATH, DEFAULT_TIMEFRAME
+from analyst.config import DB_PATH, DEFAULT_TIMEFRAME, INTERVAL_SECONDS
 from analyst.outlook_calibration import calibrate_combined
 from analyst.ingestion import make_source
 from analyst.ingestion.sentiment import SentimentClient
@@ -29,7 +29,20 @@ from analyst.alerts import detect_alerts
 from analyst.microstructure import compute_microstructure
 from analyst.onchain import onchain_snapshot
 from analyst.scanner import scan_symbols
+from analyst.storage.journal import AlertJournal
 from analyst.vol import implied_vol_context
+
+_journal: AlertJournal | None = None
+
+
+def journal() -> AlertJournal | None:
+    global _journal
+    if _journal is None:
+        try:
+            _journal = AlertJournal()
+        except Exception:
+            return None
+    return _journal
 
 HIGHER_TF ={"1m": "15m", "5m": "1h", "15m": "1h", "30m": "4h", "1h": "4h", "4h": "1D", "12h": "1D", "1D": "7D"}
 from analyst.features import compute_indicators, snapshot
@@ -73,25 +86,16 @@ def store() -> Store:
 _live_cache: dict[tuple, tuple[float, list[dict]]] = {}
 
 
-def _load_candles(symbol: str, timeframe: str, live_count: int = 1000) -> list[dict]:
-    """Candles for a symbol: from the store if ingested, else fetched live.
-
-    Lets the analyst cover any coin on demand (e.g. clicked from the scanner),
-    not just the pre-ingested BTC/ETH. Live results are cached briefly.
-    """
-    rows = store().get_candles(symbol, timeframe)
-    if rows:
-        return rows
-
-    key = (symbol, timeframe, live_count)
+def _live_fetch(symbol: str, timeframe: str, count: int = 1000) -> list[dict]:
+    """Fetch recent candles live from the venue (cached ~60s)."""
+    key = (symbol, timeframe, count)
     now = time.time()
     cached = _live_cache.get(key)
     if cached and now - cached[0] < 60:
         return cached[1]
-
     src = make_source()
     try:
-        candles, _ = src.fetch_ohlcv(symbol, timeframe, count=min(live_count, 1000))
+        candles, _ = src.fetch_ohlcv(symbol, timeframe, count=min(count, 1000))
     except Exception:
         candles = []
     finally:
@@ -105,6 +109,30 @@ def _load_candles(symbol: str, timeframe: str, live_count: int = 1000) -> list[d
     ]
     _live_cache[key] = (now, rows)
     return rows
+
+
+def _load_candles(symbol: str, timeframe: str, live_count: int = 1000) -> list[dict]:
+    """Candles for a symbol: stored history kept fresh with live bars.
+
+    Covers any coin on demand (not just pre-ingested BTC/ETH), and when the
+    stored data goes stale it merges in fresh live bars — so the view stays
+    current without a background writer (which would fight the DB lock).
+    """
+    rows = store().get_candles(symbol, timeframe)
+    if not rows:
+        return _live_fetch(symbol, timeframe, live_count)
+
+    interval_ms = INTERVAL_SECONDS.get(timeframe, 3600) * 1000
+    if rows[-1]["ts"] >= now_ms() - int(1.5 * interval_ms):
+        return rows  # fresh enough
+
+    live = _live_fetch(symbol, timeframe, live_count)  # stale -> merge fresh bars onto history
+    if not live:
+        return rows
+    merged = {r["ts"]: r for r in rows}
+    for r in live:
+        merged[r["ts"]] = r
+    return sorted(merged.values(), key=lambda r: r["ts"])
 
 
 _aux_cache: dict[tuple, tuple[float, Any]] = {}
@@ -404,7 +432,37 @@ def alerts(
     found = detect_alerts(result["rows"])
     for a in found:
         a["track_record"] = track.get(_cal_type(a))
+    j = journal()
+    if j:
+        try:
+            j.record(found, timeframe)
+        except Exception:
+            pass
     return {"timeframe": timeframe, "breadth": result["aggregates"]["breadth"], "alerts": found}
+
+
+@app.get("/alert-journal")
+def alert_journal_feed(limit: int = Query(default=60, ge=1, le=300)) -> dict:
+    """Recently journaled alerts with their since-fired outcome + a live hit rate."""
+    j = journal()
+    if not j:
+        return {"count": 0, "on_track_rate": None, "alerts": []}
+    rows = j.recent(limit)
+    price_cache: dict[tuple, float | None] = {}
+    out = []
+    for r in rows:
+        ck = (r["symbol"], r["timeframe"])
+        if ck not in price_cache:
+            candles = _load_candles(r["symbol"], r["timeframe"])
+            price_cache[ck] = candles[-1]["close"] if candles else None
+        cp = price_cache[ck]
+        ret = (cp - r["price_at_fire"]) / r["price_at_fire"] if cp and r["price_at_fire"] else None
+        on_track = None if ret is None else (ret > 0 if r["direction"] == "bull" else ret < 0 if r["direction"] == "bear" else None)
+        out.append({**r, "fired_at": ms_to_iso(r["fired_ts"]),
+                    "since_ret": round(ret, 4) if ret is not None else None, "on_track": on_track})
+    tracked = [o for o in out if o["on_track"] is not None]
+    hit = sum(1 for o in tracked if o["on_track"])
+    return {"count": len(out), "on_track_rate": round(hit / len(tracked), 3) if tracked else None, "alerts": out}
 
 
 @app.get("/alert-calibration/{symbol}")
