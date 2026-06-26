@@ -76,6 +76,20 @@ export interface ChartResponse {
   quality: QualityCheck | null;
 }
 
+export interface RiskFrame {
+  price: number;
+  horizon: number;
+  expected_move_pct: number;
+  band_low: number;
+  band_high: number;
+  atr: number;
+  atr_pct: number;
+  vol_regime: string;
+  bandwidth_pct: number | null;
+  long: { stop: number; target: number | null; rr: number | null };
+  short: { stop: number; target: number | null; rr: number | null };
+}
+
 export interface Commentary {
   symbol: string;
   timeframe: string;
@@ -90,6 +104,7 @@ export interface Commentary {
     text: string;
     invalidation: string | null;
   };
+  risk: RiskFrame | null;
   caveat: string;
 }
 

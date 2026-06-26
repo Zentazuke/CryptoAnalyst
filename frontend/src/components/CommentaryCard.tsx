@@ -44,6 +44,37 @@ export function CommentaryCard({ note }: { note: Commentary }) {
         )}
       </div>
 
+      {note.risk && (
+        <div className="risk-strip">
+          <span className="risk-item">
+            <span className="risk-k">Expected move</span>
+            <span className="risk-v">±{(note.risk.expected_move_pct * 100).toFixed(1)}%</span>
+          </span>
+          <span className="risk-item">
+            <span className="risk-k">Range</span>
+            <span className="risk-v">{note.risk.band_low.toLocaleString()}–{note.risk.band_high.toLocaleString()}</span>
+          </span>
+          <span className="risk-item">
+            <span className="risk-k">Volatility</span>
+            <span className="risk-v" style={{ color: note.risk.vol_regime === "compressed" ? "#d29922" : note.risk.vol_regime === "elevated" ? "#f0883e" : undefined }}>
+              {note.risk.vol_regime}
+            </span>
+          </span>
+          <span className="risk-item">
+            <span className="risk-k">1-ATR risk</span>
+            <span className="risk-v">{(note.risk.atr_pct * 100).toFixed(1)}%</span>
+          </span>
+          <span className="risk-item">
+            <span className="risk-k">R to resistance</span>
+            <span className="risk-v" style={{ color: "#3fb950" }}>{note.risk.long.rr != null ? `${note.risk.long.rr.toFixed(1)}R` : "—"}</span>
+          </span>
+          <span className="risk-item">
+            <span className="risk-k">R to support</span>
+            <span className="risk-v" style={{ color: "#f85149" }}>{note.risk.short.rr != null ? `${note.risk.short.rr.toFixed(1)}R` : "—"}</span>
+          </span>
+        </div>
+      )}
+
       {note.caveat && <p className="commentary-caveat">{note.caveat}</p>}
     </div>
   );

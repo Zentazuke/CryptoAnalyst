@@ -18,6 +18,7 @@ import numpy as np
 from analyst.crowd import calibrate_funding_contrarian
 from analyst.features import snapshot
 from analyst.levels import key_levels
+from analyst.risk import risk_frame
 from analyst.regime import calibrate, classify_latest
 from analyst.regime import classifier as C
 
@@ -366,6 +367,25 @@ def generate_commentary(
             )
             outlook["combined_calibration"] = {"bucket": label, **bucket}
 
+    # --- expected move + risk framing (pure vol math, not a prediction) ---
+    risk = risk_frame(candles, levels, horizon)
+    if risk:
+        win = _dur(horizon * TF_HOURS.get(timeframe, 1))
+        happening.append(
+            f"Expected 1-sigma move over the next ~{win}: ±{risk['expected_move_pct'] * 100:.1f}% "
+            f"(~{_price(risk['band_low'])}–{_price(risk['band_high'])}); volatility {risk['vol_regime']}."
+        )
+        if risk["vol_regime"] == "compressed":
+            meaning.append("Compressed volatility often precedes an expansion — be ready for a larger move (direction unconfirmed).")
+        # reward-to-level in ATR units, for the side that matches the lean
+        side = risk["long"] if tech_bias == "bullish" else risk["short"] if tech_bias == "bearish" else None
+        if side and side.get("rr") is not None and side.get("target") is not None:
+            outlook["text"] += (
+                f" Risk frame: ~{side['rr']:.1f}R to {_price(side['target'])} "
+                f"(1-ATR risk ≈ {risk['atr_pct'] * 100:.1f}%, stop ~{_price(side['stop'])})."
+            )
+        outlook["risk"] = risk
+
     headline = _headline(reg, outlook, close)
 
     return {
@@ -373,6 +393,7 @@ def generate_commentary(
         "whats_happening": happening,
         "what_it_means": meaning,
         "outlook": outlook,
+        "risk": risk,
         "caveat": (
             "This is a probabilistic read of current conditions, not a forecast. Short-horizon "
             "crypto direction is hard to predict — size and manage risk accordingly."
