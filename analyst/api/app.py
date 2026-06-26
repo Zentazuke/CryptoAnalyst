@@ -448,14 +448,13 @@ def alert_journal_feed(limit: int = Query(default=60, ge=1, le=300)) -> dict:
     if not j:
         return {"count": 0, "on_track_rate": None, "alerts": []}
     rows = j.recent(limit)
-    price_cache: dict[tuple, float | None] = {}
+    try:  # current prices from the cached market scan (one call, no per-symbol fetches)
+        price_map = {r["symbol"]: r["price"] for r in scan(timeframe="4h")["rows"]}
+    except Exception:
+        price_map = {}
     out = []
     for r in rows:
-        ck = (r["symbol"], r["timeframe"])
-        if ck not in price_cache:
-            candles = _load_candles(r["symbol"], r["timeframe"])
-            price_cache[ck] = candles[-1]["close"] if candles else None
-        cp = price_cache[ck]
+        cp = price_map.get(r["symbol"])
         ret = (cp - r["price_at_fire"]) / r["price_at_fire"] if cp and r["price_at_fire"] else None
         on_track = None if ret is None else (ret > 0 if r["direction"] == "bull" else ret < 0 if r["direction"] == "bear" else None)
         out.append({**r, "fired_at": ms_to_iso(r["fired_ts"]),
