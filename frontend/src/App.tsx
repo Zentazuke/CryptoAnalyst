@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { fetchChart, fetchMicro, fetchCommentary, fetchSentiment, fetchScan, API_BASE } from "./api";
-import type { ChartResponse, Commentary, MicroSnapshot, ScanResponse, Sentiment } from "./types";
+import { fetchChart, fetchMicro, fetchCommentary, fetchSentiment, fetchScan, fetchOnchain, API_BASE } from "./api";
+import type { ChartResponse, Commentary, MicroSnapshot, OnChain, ScanResponse, Sentiment } from "./types";
 import { Controls } from "./components/Controls";
 import { TrustBar } from "./components/TrustBar";
 import { Dashboard } from "./components/Dashboard";
@@ -9,6 +9,7 @@ import { MicrostructureCard } from "./components/MicrostructureCard";
 import { CommentaryCard } from "./components/CommentaryCard";
 import { SentimentCard } from "./components/SentimentCard";
 import { MarketScanCard } from "./components/MarketScanCard";
+import { OnChainCard } from "./components/OnChainCard";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
 const SYMBOLS = ["BTC_USDT", "ETH_USDT"];
@@ -21,6 +22,7 @@ export default function App() {
   const [micro, setMicro] = useState<MicroSnapshot | null>(null);
   const [note, setNote] = useState<Commentary | null>(null);
   const [sentiment, setSentiment] = useState<Sentiment | null>(null);
+  const [onchain, setOnchain] = useState<OnChain | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [auto, setAuto] = useState(false);
@@ -42,12 +44,14 @@ export default function App() {
       fetchMicro(symbol),
       fetchCommentary(symbol, timeframe),
       fetchSentiment(symbol),
+      fetchOnchain(symbol),
     ])
-      .then(([chart, m, n, s]) => {
+      .then(([chart, m, n, s, oc]) => {
         setData(chart);
         setMicro(m);
         setNote(n);
         setSentiment(s);
+        setOnchain(oc);
       })
       .catch((e: Error) => {
         setData(null);
@@ -119,9 +123,14 @@ export default function App() {
       )}
 
       {data && (
-        <ErrorBoundary name="Sentiment card">
-          <SentimentCard sentiment={sentiment} />
-        </ErrorBoundary>
+        <div className="cards-row">
+          <ErrorBoundary name="Sentiment card">
+            <SentimentCard sentiment={sentiment} />
+          </ErrorBoundary>
+          <ErrorBoundary name="On-chain card">
+            <OnChainCard onchain={onchain} />
+          </ErrorBoundary>
+        </div>
       )}
 
       {loading && <div className="status">Loading {symbol} {timeframe}…</div>}

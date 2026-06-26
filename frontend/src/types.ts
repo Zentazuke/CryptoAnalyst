@@ -171,6 +171,19 @@ export interface Sentiment {
   recent?: { events?: { text?: string; score?: number; source?: string }[] } | null;
 }
 
+export interface OnChain {
+  symbol: string;
+  available: boolean;
+  asset?: string;
+  active_addresses?: number;
+  addr_trend_30d?: number | null;
+  addr_percentile_90d?: number | null;
+  tx_count?: number | null;
+  tx_trend_30d?: number | null;
+  price_trend_30d?: number | null;
+  divergence?: string;
+}
+
 export interface MicroSnapshot {
   symbol: string;
   ts: number;

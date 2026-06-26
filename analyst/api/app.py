@@ -25,6 +25,7 @@ from analyst.ingestion import make_source
 from analyst.ingestion.sentiment import SentimentClient
 from analyst.levels import key_levels
 from analyst.microstructure import compute_microstructure
+from analyst.onchain import onchain_snapshot
 from analyst.scanner import scan_symbols
 
 HIGHER_TF ={"1m": "15m", "5m": "1h", "15m": "1h", "30m": "4h", "1h": "4h", "4h": "1D", "12h": "1D", "1D": "7D"}
@@ -161,6 +162,11 @@ def _load_micro(symbol: str) -> dict | None:
                 src.close()
 
     return _cached(("micro", symbol), 30, fetch)
+
+
+def _load_onchain(symbol: str) -> dict | None:
+    """On-chain network-activity snapshot (cached ~1h; daily data)."""
+    return _cached(("onchain", symbol), 3600, lambda: onchain_snapshot(symbol))
 
 
 def _htf_context(symbol: str, timeframe: str) -> dict | None:
@@ -355,6 +361,15 @@ def scan(
     return {**result, "cached": False}
 
 
+@app.get("/onchain/{symbol}")
+def onchain(symbol: str) -> dict:
+    """On-chain network activity (free Coin Metrics data), or {available: false}."""
+    snap = _load_onchain(symbol)
+    if not snap:
+        return {"symbol": symbol, "available": False}
+    return {"symbol": symbol, "available": True, **snap}
+
+
 @app.get("/sentiment/{symbol}")
 def sentiment(symbol: str) -> dict:
     """Live sentiment from the sentiment engine, or {available: false} if offline."""
@@ -397,6 +412,7 @@ def commentary(
     note = generate_commentary(
         rows, timeframe, micro=micro, sentiment=sentiment_bundle, funding_rows=funding_rows,
         positioning=positioning, derivatives=derivatives, htf=htf, outlook_calibration=outlook_cal,
+        onchain=_load_onchain(symbol),
     )
     return {"symbol": symbol, "timeframe": timeframe, "as_of": ms_to_iso(rows[-1]["ts"]), **note}
 

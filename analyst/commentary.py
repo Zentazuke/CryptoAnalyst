@@ -128,6 +128,7 @@ def generate_commentary(
     funding_rows: list[dict] | None = None,
     positioning: dict | None = None, derivatives: dict | None = None,
     htf: dict | None = None, outlook_calibration: dict | None = None,
+    onchain: dict | None = None,
 ) -> dict:
     if len(candles) < 60:
         return {
@@ -279,6 +280,23 @@ def generate_commentary(
         if shock and str(shock).lower() not in ("none", "false", "calm", "normal"):
             happening.append(f"Shock alert: {shock}.")
             meaning.append("An active panic/euphoria shock means headline-driven volatility — be cautious with mechanical signals.")
+
+    # --- on-chain network activity (free Coin Metrics community data) ---
+    if onchain:
+        at = onchain.get("addr_trend_30d")
+        pct = onchain.get("addr_percentile_90d")
+        div = onchain.get("divergence")
+        if at is not None:
+            happening.append(
+                f"On-chain: active addresses {at * 100:+.0f}% over 30d"
+                + (f" ({pct * 100:.0f}th pct of the 90d range)." if pct is not None else ".")
+            )
+        if div == "bullish":
+            happening.append("On-chain bullish divergence: network activity rising while price falls.")
+            meaning.append("Rising on-chain activity into a falling price suggests accumulation/usage building — historically a constructive divergence.")
+        elif div == "bearish":
+            happening.append("On-chain bearish divergence: activity fading while price rises.")
+            meaning.append("A rally on fading on-chain activity is lower-quality — watch for exhaustion.")
 
     outlook = _outlook(reg, cal, horizon, timeframe, close, ema, bb_m, bb_u, bb_l, chg)
     tech_bias = BIAS.get(reg.label, "neutral")
