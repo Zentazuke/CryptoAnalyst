@@ -231,6 +231,19 @@ header.app-head {
 .scan-table tbody tr.clickable { cursor: pointer; }
 .scan-table tbody tr:hover { background: rgba(255,255,255,0.03); }
 
+/* Alerts */
+.alert-list { list-style: none; margin: 0; padding: 0; }
+.alert-item {
+  display: flex; align-items: center; gap: 10px; padding: 6px 10px;
+  border-left: 3px solid var(--border); border-radius: 4px; margin-bottom: 4px;
+  background: rgba(255,255,255,0.02); font-size: 13px;
+}
+.alert-item.clickable { cursor: pointer; }
+.alert-item.clickable:hover { background: rgba(255,255,255,0.05); }
+.alert-sev { color: var(--warn); font-size: 9px; letter-spacing: 1px; width: 38px; }
+.alert-kind { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; width: 96px; }
+.alert-note { color: var(--text); flex: 1; }
+
 /* Auto-refresh toggle */
 .auto-toggle {
   display: inline-flex; align-items: center; gap: 6px; cursor: pointer;

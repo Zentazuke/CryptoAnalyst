@@ -124,6 +124,21 @@ export interface ScanResponse {
   cached?: boolean;
 }
 
+export interface Alert {
+  symbol: string;
+  kind: string;
+  direction: string;
+  severity: number;
+  signals: string[];
+  note: string;
+}
+
+export interface AlertsResponse {
+  timeframe: string;
+  breadth: string;
+  alerts: Alert[];
+}
+
 export interface Sentiment {
   symbol: string;
   available: boolean;

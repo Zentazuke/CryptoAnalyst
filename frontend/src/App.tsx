@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { fetchChart, fetchMicro, fetchCommentary, fetchSentiment, fetchScan, fetchOnchain, API_BASE } from "./api";
-import type { ChartResponse, Commentary, MicroSnapshot, OnChain, ScanResponse, Sentiment } from "./types";
+import { fetchChart, fetchMicro, fetchCommentary, fetchSentiment, fetchScan, fetchOnchain, fetchAlerts, API_BASE } from "./api";
+import type { AlertsResponse, ChartResponse, Commentary, MicroSnapshot, OnChain, ScanResponse, Sentiment } from "./types";
 import { Controls } from "./components/Controls";
 import { TrustBar } from "./components/TrustBar";
 import { Dashboard } from "./components/Dashboard";
@@ -9,6 +9,7 @@ import { MicrostructureCard } from "./components/MicrostructureCard";
 import { CommentaryCard } from "./components/CommentaryCard";
 import { SentimentCard } from "./components/SentimentCard";
 import { MarketScanCard } from "./components/MarketScanCard";
+import { AlertsCard } from "./components/AlertsCard";
 import { OnChainCard } from "./components/OnChainCard";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
@@ -27,12 +28,16 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [auto, setAuto] = useState(false);
   const [scan, setScan] = useState<ScanResponse | null>(null);
+  const [alerts, setAlerts] = useState<AlertsResponse | null>(null);
   const [scanLoading, setScanLoading] = useState(false);
 
   const loadScan = useCallback(() => {
     setScanLoading(true);
-    fetchScan("4h", 24)
-      .then(setScan)
+    Promise.all([fetchScan("4h", 24), fetchAlerts("4h", 24)])
+      .then(([sc, al]) => {
+        setScan(sc);
+        setAlerts(al);
+      })
       .finally(() => setScanLoading(false));
   }, []);
 
@@ -68,6 +73,9 @@ export default function App() {
     loadScan();
   }, [loadScan]);
 
+  const pickInstrument = (inst: string) =>
+    setSymbol(inst.endsWith("USDT") ? `${inst.slice(0, -4)}_USDT` : inst);
+
   // real-time feel: poll while auto-refresh is on
   useEffect(() => {
     if (!auto) return;
@@ -99,8 +107,12 @@ export default function App() {
           scan={scan}
           loading={scanLoading}
           onRefresh={loadScan}
-          onPick={(inst) => setSymbol(inst.endsWith("USDT") ? `${inst.slice(0, -4)}_USDT` : inst)}
+          onPick={pickInstrument}
         />
+      </ErrorBoundary>
+
+      <ErrorBoundary name="Alerts">
+        <AlertsCard data={alerts} onPick={pickInstrument} />
       </ErrorBoundary>
 
       {data && <TrustBar data={data} timeframe={timeframe} />}

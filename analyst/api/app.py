@@ -24,6 +24,7 @@ from analyst.outlook_calibration import calibrate_combined
 from analyst.ingestion import make_source
 from analyst.ingestion.sentiment import SentimentClient
 from analyst.levels import key_levels
+from analyst.alerts import detect_alerts
 from analyst.microstructure import compute_microstructure
 from analyst.onchain import onchain_snapshot
 from analyst.scanner import scan_symbols
@@ -368,6 +369,20 @@ def onchain(symbol: str) -> dict:
     if not snap:
         return {"symbol": symbol, "available": False}
     return {"symbol": symbol, "available": True, **snap}
+
+
+@app.get("/alerts")
+def alerts(
+    timeframe: str = Query(default="4h"),
+    limit: int = Query(default=24, ge=4, le=60),
+) -> dict:
+    """Confluence-ranked setups across the scanned market (reuses the scan)."""
+    result = scan(timeframe=timeframe, limit=limit)  # cached
+    return {
+        "timeframe": timeframe,
+        "breadth": result["aggregates"]["breadth"],
+        "alerts": detect_alerts(result["rows"]),
+    }
 
 
 @app.get("/sentiment/{symbol}")
