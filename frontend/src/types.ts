@@ -131,6 +131,7 @@ export interface Alert {
   severity: number;
   signals: string[];
   note: string;
+  track_record?: { count: number; hit_rate: number; base_rate: number; lift: number | null } | null;
 }
 
 export interface AlertsResponse {

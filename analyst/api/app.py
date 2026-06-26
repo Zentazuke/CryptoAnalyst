@@ -24,6 +24,7 @@ from analyst.outlook_calibration import calibrate_combined
 from analyst.ingestion import make_source
 from analyst.ingestion.sentiment import SentimentClient
 from analyst.levels import key_levels
+from analyst.alert_calibration import aggregate_track_records, calibrate_alerts
 from analyst.alerts import detect_alerts
 from analyst.microstructure import compute_microstructure
 from analyst.onchain import onchain_snapshot
@@ -371,18 +372,54 @@ def onchain(symbol: str) -> dict:
     return {"symbol": symbol, "available": True, **snap}
 
 
+def _alert_track_record() -> dict:
+    """Per-alert-type historical track record (aggregated over BTC/ETH, cached)."""
+    def fetch():
+        reps = []
+        for sym in ("BTC_USDT", "ETH_USDT"):
+            rows = store().get_candles(sym, "4h")
+            if rows:
+                reps.append(calibrate_alerts(rows, store().get_funding(sym), horizon=12))
+        return aggregate_track_records(reps)
+
+    return _cached(("alert_tr",), 3600, fetch)
+
+
+def _cal_type(alert: dict) -> str:
+    if alert["kind"] == "rsi-extreme":
+        return "rsi-oversold" if alert["direction"] == "bull" else "rsi-overbought"
+    return alert["kind"]
+
+
 @app.get("/alerts")
 def alerts(
     timeframe: str = Query(default="4h"),
     limit: int = Query(default=24, ge=4, le=60),
 ) -> dict:
-    """Confluence-ranked setups across the scanned market (reuses the scan)."""
+    """Confluence-ranked setups across the scanned market, each with its measured
+    track record (so you know which setup types historically have edge)."""
     result = scan(timeframe=timeframe, limit=limit)  # cached
-    return {
-        "timeframe": timeframe,
-        "breadth": result["aggregates"]["breadth"],
-        "alerts": detect_alerts(result["rows"]),
-    }
+    track = _alert_track_record()
+    found = detect_alerts(result["rows"])
+    for a in found:
+        a["track_record"] = track.get(_cal_type(a))
+    return {"timeframe": timeframe, "breadth": result["aggregates"]["breadth"], "alerts": found}
+
+
+@app.get("/alert-calibration/{symbol}")
+def alert_calibration(
+    symbol: str,
+    timeframe: str = Query(default="4h"),
+    horizon: int = Query(default=12, ge=1, le=200),
+) -> dict:
+    """Per-alert-type forward hit-rate/lift for a symbol (does each setup work?)."""
+    rows = _load_candles(symbol, timeframe)
+    if not rows:
+        raise HTTPException(status_code=404, detail=f"no {timeframe} data for {symbol}")
+    rep = calibrate_alerts(rows, _load_funding(symbol), horizon=horizon)
+    if rep is None:
+        raise HTTPException(status_code=422, detail="not enough history to calibrate")
+    return {"symbol": symbol, "timeframe": timeframe, **rep}
 
 
 @app.get("/sentiment/{symbol}")

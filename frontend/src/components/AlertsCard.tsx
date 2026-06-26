@@ -35,6 +35,15 @@ export function AlertsCard({
             <b style={{ color: dirColor(a.direction) }}>{a.symbol}</b>
             <span className="alert-kind">{a.kind}</span>
             <span className="alert-note">{a.note}</span>
+            {a.track_record?.lift != null && (
+              <span
+                className="alert-lift"
+                style={{ color: a.track_record.lift >= 1.1 ? "#3fb950" : "#8b949e" }}
+                title={`This setup type historically resolved ${(a.track_record.hit_rate * 100).toFixed(0)}% vs ${(a.track_record.base_rate * 100).toFixed(0)}% base (n=${a.track_record.count})`}
+              >
+                {a.track_record.lift.toFixed(2)}×
+              </span>
+            )}
           </li>
         ))}
       </ul>
