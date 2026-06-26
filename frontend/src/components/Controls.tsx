@@ -18,7 +18,7 @@ export function Controls({
       <label htmlFor="symbol">Symbol</label>
       <select id="symbol" value={symbol} onChange={(e) => onSymbol(e.target.value)}>
         {symbols.map((s) => (
-          <option key={s} value={s}>{s}</option>
+          <option key={s} value={s}>{s.replace("_", "/")}</option>
         ))}
       </select>
 

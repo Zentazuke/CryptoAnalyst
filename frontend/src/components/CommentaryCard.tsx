@@ -8,12 +8,51 @@ const BIAS_COLOR: Record<string, string> = {
   "high-risk": "#f0883e",
 };
 
-/** The written analyst note: headline, observations, interpretation, outlook. */
-export function CommentaryCard({ note }: { note: Commentary }) {
+const asOfTime = (iso: string) => {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime())
+    ? iso
+    : d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+};
+
+interface Props {
+  note: Commentary | null;
+  symbol: string;
+  timeframe: string;
+  loading: boolean;
+  onSimulate: () => void;
+}
+
+/** The written analyst note: headline, observations, interpretation, outlook.
+ *  Generated on demand — each "Simulate" pulls a fresh read from live data. */
+export function CommentaryCard({ note, symbol, timeframe, loading, onSimulate }: Props) {
+  const header = (
+    <div className="commentary-bar">
+      <span className="card-title" style={{ margin: 0 }}>Analyst note</span>
+      {note && <span className="commentary-asof">as of {asOfTime(note.as_of)} · live data</span>}
+      <button className="sim-btn" onClick={onSimulate} disabled={loading} title="Generate a fresh analyst read from the latest live data">
+        {loading ? "Simulating…" : note ? "↻ Simulate again" : "▶ Simulate"}
+      </button>
+    </div>
+  );
+
+  if (!note) {
+    return (
+      <div className="card commentary">
+        {header}
+        <p className="muted-txt" style={{ margin: "10px 2px 2px" }}>
+          {loading
+            ? `Generating an analyst read for ${symbol.replace("_", "/")} · ${timeframe}…`
+            : `Press Simulate for an analyst read on ${symbol.replace("_", "/")} · ${timeframe}, built from the latest live data.`}
+        </p>
+      </div>
+    );
+  }
+
   const color = BIAS_COLOR[note.outlook.bias] ?? "#8b949e";
   return (
     <div className="card commentary">
-      <div className="card-title">Analyst note</div>
+      {header}
       <p className="commentary-headline">{note.headline}</p>
 
       <div className="commentary-cols">

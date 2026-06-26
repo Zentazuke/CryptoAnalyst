@@ -91,10 +91,20 @@ export interface RiskFrame {
   implied_vol?: { dvol: number; realized_vol_annual: number; premium_pts: number; signal: string } | null;
 }
 
+export interface MetricRead {
+  key: string;
+  title: string;
+  bias: string | null;
+  reading: string;
+  meaning: string;
+  outlook: string;
+}
+
 export interface Commentary {
   symbol: string;
   timeframe: string;
   as_of: string;
+  metric_reads?: MetricRead[];
   headline: string;
   whats_happening: string[];
   what_it_means: string[];
@@ -254,4 +264,5 @@ export interface MicroSnapshot {
   mark_price: number | null;
   index_price: number | null;
   basis_bps: number | null;
+  live?: boolean;
 }

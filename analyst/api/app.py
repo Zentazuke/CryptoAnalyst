@@ -19,6 +19,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from analyst.commentary import DEFAULT_HORIZON, generate_commentary
+from analyst.metric_reads import metric_reads
 from analyst.config import DB_PATH, DEFAULT_TIMEFRAME, INTERVAL_SECONDS
 from analyst.outlook_calibration import calibrate_combined
 from analyst.ingestion import make_source
@@ -172,10 +173,25 @@ def _load_funding(symbol: str) -> list[dict]:
     return _cached(("funding", symbol), 600, fetch)
 
 
+# Order-book state is point-in-time: a stored snapshot is only trustworthy while
+# it is recent and complete. Older than this, we recompute live instead.
+MICRO_STORED_MAX_AGE_S = 90
+
+
+def _micro_is_fresh(row: dict, max_age_s: int = MICRO_STORED_MAX_AGE_S) -> bool:
+    """A stored snapshot is usable only if it's recent and has the core fields."""
+    ts = row.get("ts")
+    if not ts or row.get("mid") is None or row.get("spread_bps") is None:
+        return False
+    return 0 <= time.time() - ts / 1000.0 <= max_age_s
+
+
 def _load_micro(symbol: str) -> dict | None:
-    """Latest microstructure: stored if present, else computed live (not stored)."""
+    """Latest microstructure: a *fresh* stored snapshot if we have one, otherwise
+    a live order-book read (cached ~30s). A stale stored row is worse than
+    useless for point-in-time book state, so we never surface it as current."""
     rows = store().get_micro(symbol, limit=1)
-    if rows:
+    if rows and _micro_is_fresh(rows[0]):
         return rows[0]
 
     def fetch():
@@ -296,12 +312,26 @@ def microstructure(
     symbol: str,
     limit: int = Query(default=1, ge=1, le=2000),
 ) -> dict:
-    """Latest (or recent) market-microstructure snapshot(s) for a symbol."""
+    """Latest (or recent) market-microstructure snapshot(s) for a symbol.
+
+    For the latest snapshot (limit=1, what the card uses) we go through the
+    freshness gate: a recent stored row is returned as-is, otherwise a live
+    order-book read is computed — never a stale point-in-time row. For history
+    (limit>1) we return the stored rows directly.
+    """
+    if limit == 1:
+        snap = _load_micro(symbol)
+        if snap:
+            if not snap.get("snapshot_time") and snap.get("ts"):
+                snap["snapshot_time"] = ms_to_iso(snap["ts"])
+            return {"symbol": symbol, "count": 1, "snapshots": [snap]}
+        raise HTTPException(
+            status_code=404,
+            detail=f"no microstructure for {symbol} — run `python -m analyst.collect_micro`",
+        )
+
     rows = store().get_micro(symbol, limit=limit)
     if not rows:
-        live = _load_micro(symbol)  # compute one live (e.g. a coin clicked from the scan)
-        if live:
-            return {"symbol": symbol, "count": 1, "snapshots": [live]}
         raise HTTPException(
             status_code=404,
             detail=f"no microstructure for {symbol} — run `python -m analyst.collect_micro`",
@@ -519,13 +549,20 @@ def commentary(
     horizon = DEFAULT_HORIZON.get(timeframe, 12)
     outlook_cal = calibrate_combined(rows, funding_rows, htf_candles=htf_rows or None, horizon=horizon)
 
+    onchain = _load_onchain(symbol)
     note = generate_commentary(
         rows, timeframe, micro=micro, sentiment=sentiment_bundle, funding_rows=funding_rows,
         positioning=positioning, derivatives=derivatives, htf=htf, outlook_calibration=outlook_cal,
-        onchain=_load_onchain(symbol),
+        onchain=onchain,
         vol_iv=_cached(("iv", symbol, timeframe), 600, lambda: implied_vol_context(symbol, rows, timeframe)),
     )
-    return {"symbol": symbol, "timeframe": timeframe, "as_of": ms_to_iso(rows[-1]["ts"]), **note}
+    # focused per-metric breakdown (each signal read on its own)
+    reads = metric_reads(
+        rows, timeframe, micro=micro, sentiment=sentiment_bundle, funding_rows=funding_rows,
+        positioning=positioning, derivatives=derivatives, htf=htf, onchain=onchain, horizon=horizon,
+    )
+    return {"symbol": symbol, "timeframe": timeframe, "as_of": ms_to_iso(rows[-1]["ts"]),
+            "metric_reads": reads, **note}
 
 
 def _line(times: list[int], arr) -> list[dict]:

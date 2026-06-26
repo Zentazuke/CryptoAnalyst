@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchChart, fetchMicro, fetchCommentary, fetchSentiment, fetchScan, fetchOnchain, fetchAlerts, fetchAlertJournal, API_BASE } from "./api";
 import type { AlertJournalResponse, AlertsResponse, ChartResponse, Commentary, MicroSnapshot, OnChain, ScanResponse, Sentiment } from "./types";
 import { Controls } from "./components/Controls";
@@ -8,6 +8,7 @@ import { Dashboard } from "./components/Dashboard";
 import { RegimeCard } from "./components/RegimeCard";
 import { MicrostructureCard } from "./components/MicrostructureCard";
 import { CommentaryCard } from "./components/CommentaryCard";
+import { MetricBreakdown } from "./components/MetricBreakdown";
 import { SentimentCard } from "./components/SentimentCard";
 import { MarketScanCard } from "./components/MarketScanCard";
 import { AlertsCard } from "./components/AlertsCard";
@@ -17,6 +18,23 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 
 const SYMBOLS = ["BTC_USDT", "ETH_USDT"];
 const TIMEFRAMES = ["1h", "4h", "1D"];
+
+/** Exchange instrument ("BTCUSDT") -> internal symbol ("BTC_USDT"). */
+const toInternal = (inst: string) =>
+  inst.endsWith("USDT") ? `${inst.slice(0, -4)}_USDT` : inst;
+
+// Binance gives no market cap, so we order the picker the way every market site
+// does: by market-cap rank (stables excluded — the scanner drops them too).
+// Coins outside this list fall in afterwards, in the scan's (volume) order.
+const MCAP_ORDER = [
+  "BTC", "ETH", "BNB", "SOL", "XRP", "DOGE", "ADA", "TRX", "AVAX", "LINK",
+  "TON", "SHIB", "DOT", "BCH", "NEAR", "LTC", "POL", "MATIC", "UNI", "ICP",
+  "APT", "XLM", "ETC", "FIL", "HBAR", "ARB", "OP", "ATOM", "INJ", "SUI",
+];
+const mcapRank = (internalSymbol: string) => {
+  const i = MCAP_ORDER.indexOf(internalSymbol.replace("_USDT", ""));
+  return i === -1 ? Number.MAX_SAFE_INTEGER : i;
+};
 
 export default function App() {
   const [symbol, setSymbol] = useState(SYMBOLS[0]);
@@ -28,6 +46,7 @@ export default function App() {
   const [onchain, setOnchain] = useState<OnChain | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [noteLoading, setNoteLoading] = useState(false);
   const [auto, setAuto] = useState(false);
   const [scan, setScan] = useState<ScanResponse | null>(null);
   const [alerts, setAlerts] = useState<AlertsResponse | null>(null);
@@ -45,28 +64,36 @@ export default function App() {
       .finally(() => setScanLoading(false));
   }, []);
 
+  // Live feeds — charts, microstructure and sentiment. Driven by the symbol/
+  // timeframe pickers, the Refresh button, and the Live auto-poll.
   const load = useCallback(() => {
     setLoading(true);
     setError(null);
     Promise.all([
       fetchChart(symbol, timeframe),
       fetchMicro(symbol),
-      fetchCommentary(symbol, timeframe),
       fetchSentiment(symbol),
-      fetchOnchain(symbol),
     ])
-      .then(([chart, m, n, s, oc]) => {
+      .then(([chart, m, s]) => {
         setData(chart);
         setMicro(m);
-        setNote(n);
         setSentiment(s);
-        setOnchain(oc);
       })
       .catch((e: Error) => {
         setData(null);
         setError(e.message);
       })
       .finally(() => setLoading(false));
+  }, [symbol, timeframe]);
+
+  // Analyst commentary is decoupled from the live feeds: it only regenerates
+  // when you press Simulate. Each run pulls a fresh read from the latest live
+  // data (the backend always serves current candles).
+  const simulate = useCallback(() => {
+    setNoteLoading(true);
+    fetchCommentary(symbol, timeframe)
+      .then(setNote)
+      .finally(() => setNoteLoading(false));
   }, [symbol, timeframe]);
 
   useEffect(() => {
@@ -77,8 +104,37 @@ export default function App() {
     loadScan();
   }, [loadScan]);
 
-  const pickInstrument = (inst: string) =>
-    setSymbol(inst.endsWith("USDT") ? `${inst.slice(0, -4)}_USDT` : inst);
+  // On-chain is slow-moving daily data — load once per symbol, never polled.
+  useEffect(() => {
+    fetchOnchain(symbol).then(setOnchain).catch(() => setOnchain(null));
+  }, [symbol]);
+
+  // Drop the stale note when the instrument/timeframe changes so the card never
+  // shows a read that no longer matches what you're looking at.
+  useEffect(() => {
+    setNote(null);
+  }, [symbol, timeframe]);
+
+  // Generate one initial read on first mount so the card isn't empty.
+  const didInit = useRef(false);
+  useEffect(() => {
+    if (didInit.current) return;
+    didInit.current = true;
+    simulate();
+  }, [simulate]);
+
+  const pickInstrument = (inst: string) => setSymbol(toInternal(inst));
+
+  // Top coins sourced live from the market scan, ordered by market-cap rank
+  // (stable, like other market sites). Falls back to the static defaults until
+  // the scan lands, and always includes the active symbol.
+  const symbolOptions = Array.from(
+    new Set([
+      ...(scan?.rows ?? []).map((r) => toInternal(r.instrument)),
+      ...SYMBOLS,
+      symbol,
+    ]),
+  ).sort((a, b) => mcapRank(a) - mcapRank(b));
 
   // real-time feel: poll while auto-refresh is on
   useEffect(() => {
@@ -96,7 +152,7 @@ export default function App() {
         <Controls
           symbol={symbol}
           timeframe={timeframe}
-          symbols={Array.from(new Set([...SYMBOLS, symbol]))}
+          symbols={symbolOptions}
           timeframes={TIMEFRAMES}
           onSymbol={setSymbol}
           onTimeframe={setTimeframe}
@@ -109,13 +165,25 @@ export default function App() {
       {/* ── The synthesized read, up top: everything condensed and analysed ── */}
       {data && <TrustBar data={data} timeframe={timeframe} />}
 
-      {note && (
-        <ErrorBoundary name="Analyst note">
-          <CommentaryCard note={note} />
-        </ErrorBoundary>
+      <ErrorBoundary name="Analyst note">
+        <CommentaryCard
+          note={note}
+          symbol={symbol}
+          timeframe={timeframe}
+          loading={noteLoading}
+          onSimulate={simulate}
+        />
+      </ErrorBoundary>
+
+      {note?.metric_reads && note.metric_reads.length > 0 && (
+        <Section title="Analyst breakdown" subtitle="each metric read on its own — what it shows, means & where it points">
+          <ErrorBoundary name="Metric breakdown">
+            <MetricBreakdown reads={note.metric_reads} />
+          </ErrorBoundary>
+        </Section>
       )}
 
-      {loading && <div className="status">Loading {symbol} {timeframe}…</div>}
+      {loading && !data && <div className="status">Loading {symbol} {timeframe}…</div>}
 
       {error && (
         <div className="status error">
@@ -130,7 +198,7 @@ export default function App() {
 
       {/* ── Then we break it apart: the evidence behind the read ── */}
       {data && (
-        <Section title="Evidence" subtitle="regime · microstructure · sentiment · on-chain">
+        <Section title="Evidence" subtitle="regime · microstructure · on-chain · sentiment">
           <div className="cards-row">
             <ErrorBoundary name="Regime card">
               <RegimeCard regime={data.regime_current} timeframe={timeframe} />
@@ -140,17 +208,19 @@ export default function App() {
             </ErrorBoundary>
           </div>
           <div className="cards-row">
-            <ErrorBoundary name="Sentiment card">
-              <SentimentCard sentiment={sentiment} />
-            </ErrorBoundary>
             <ErrorBoundary name="On-chain card">
               <OnChainCard onchain={onchain} />
             </ErrorBoundary>
           </div>
+          {/* Sentiment carries the most content — give it the full width so it
+              has room to breathe instead of overflowing a half-column. */}
+          <ErrorBoundary name="Sentiment card">
+            <SentimentCard sentiment={sentiment} />
+          </ErrorBoundary>
         </Section>
       )}
 
-      {!loading && !error && data && (
+      {data && (
         <Section title="Charts" subtitle="price, levels & indicator panes">
           <ErrorBoundary name="Charts">
             <Dashboard data={data} />

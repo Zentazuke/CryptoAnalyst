@@ -25,12 +25,13 @@ export function MicrostructureCard({ micro }: { micro: MicroSnapshot | null }) {
     <div className="card">
       <div className="card-title">
         Microstructure <span className="muted-txt">· {new Date(micro.snapshot_time).toLocaleString()}</span>
+        {micro.live && <span className="badge good" style={{ marginLeft: 8 }}>live</span>}
       </div>
       <div className="stat-grid">
         <Stat label="Spread" value={fmt(micro.spread_bps, 3, " bps")} />
         <Stat label="Mid" value={fmt(micro.mid, 2)} />
         <Stat
-          label={`Depth ±${micro.depth_band_bps}bps`}
+          label={micro.depth_band_bps != null ? `Depth ±${micro.depth_band_bps}bps` : "Depth"}
           value={`${fmt(micro.bid_depth_quote, 0)} / ${fmt(micro.ask_depth_quote, 0)}`}
           hint="bid / ask quote notional"
         />
