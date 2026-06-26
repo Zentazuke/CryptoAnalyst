@@ -18,8 +18,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
-from analyst.commentary import generate_commentary
+from analyst.commentary import DEFAULT_HORIZON, generate_commentary
 from analyst.config import DB_PATH, DEFAULT_TIMEFRAME
+from analyst.outlook_calibration import calibrate_combined
 from analyst.ingestion import make_source
 from analyst.ingestion.sentiment import SentimentClient
 from analyst.levels import key_levels
@@ -293,6 +294,25 @@ def regime(
     }
 
 
+@app.get("/outlook-calibration/{symbol}")
+def outlook_calibration(
+    symbol: str,
+    timeframe: str = Query(default=DEFAULT_TIMEFRAME),
+    horizon: int = Query(default=24, ge=1, le=200),
+) -> dict:
+    """Does confluence beat the parts? Measured lift for regime / htf / crowd /
+    their agreement, on reconstructable history (live news-sentiment excluded)."""
+    rows = _load_candles(symbol, timeframe)
+    if not rows:
+        raise HTTPException(status_code=404, detail=f"no {timeframe} data for {symbol}")
+    higher = HIGHER_TF.get(timeframe)
+    htf_rows = _load_candles(symbol, higher) if higher else None
+    rep = calibrate_combined(rows, _load_funding(symbol), htf_candles=htf_rows, horizon=horizon)
+    if rep is None:
+        raise HTTPException(status_code=422, detail="not enough history to calibrate")
+    return {"symbol": symbol, "timeframe": timeframe, **rep}
+
+
 @app.get("/regime/{symbol}/calibration")
 def regime_calibration(
     symbol: str,
@@ -365,10 +385,18 @@ def commentary(
     if not derivatives and micro and micro.get("funding_rate") is not None:
         derivatives = {"funding_rate": micro["funding_rate"], "open_interest_usd": micro.get("open_interest")}
 
-    htf = _htf_context(symbol, timeframe)
+    higher = HIGHER_TF.get(timeframe)
+    htf_rows = _load_candles(symbol, higher) if higher else []
+    htf = None
+    if len(htf_rows) >= 60:
+        hreg = classify_latest(htf_rows)
+        htf = {"timeframe": higher, "label": hreg.label, "confidence": hreg.confidence}
+    horizon = DEFAULT_HORIZON.get(timeframe, 12)
+    outlook_cal = calibrate_combined(rows, funding_rows, htf_candles=htf_rows or None, horizon=horizon)
+
     note = generate_commentary(
         rows, timeframe, micro=micro, sentiment=sentiment_bundle, funding_rows=funding_rows,
-        positioning=positioning, derivatives=derivatives, htf=htf,
+        positioning=positioning, derivatives=derivatives, htf=htf, outlook_calibration=outlook_cal,
     )
     return {"symbol": symbol, "timeframe": timeframe, "as_of": ms_to_iso(rows[-1]["ts"]), **note}
 

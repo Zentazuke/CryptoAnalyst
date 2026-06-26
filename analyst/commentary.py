@@ -127,7 +127,7 @@ def generate_commentary(
     horizon: int | None = None, sentiment: dict | None = None,
     funding_rows: list[dict] | None = None,
     positioning: dict | None = None, derivatives: dict | None = None,
-    htf: dict | None = None,
+    htf: dict | None = None, outlook_calibration: dict | None = None,
 ) -> dict:
     if len(candles) < 60:
         return {
@@ -321,6 +321,32 @@ def generate_commentary(
                 meaning.append(f"The higher timeframe ({htf['timeframe']}) is {htf_bias}, so this {tech_bias} move is counter-trend — treat it cautiously.")
             else:
                 meaning.append(f"The higher timeframe ({htf['timeframe']}) agrees ({htf_bias}) — timeframes are aligned, a higher-quality backdrop.")
+
+    # --- measured confluence track record for the current alignment ---
+    if outlook_calibration:
+        ps = outlook_calibration.get("per_signal", {})
+        tb = 1 if tech_bias == "bullish" else -1 if tech_bias == "bearish" else 0
+        cb = 1 if (crowd and crowd.get("bias") == "bullish") else -1 if (crowd and crowd.get("bias") == "bearish") else 0
+        hb = 0
+        if htf and htf.get("label"):
+            hbias = BIAS.get(htf["label"], "neutral")
+            hb = 1 if hbias == "bullish" else -1 if hbias == "bearish" else 0
+
+        bucket = label = None
+        if tb != 0 and tb == cb == hb and ps.get("all_agree"):
+            bucket, label = ps["all_agree"], "all three signals (regime, higher timeframe, crowd) agree"
+        elif tb != 0 and tb == cb and ps.get("regime+crowd_agree"):
+            bucket, label = ps["regime+crowd_agree"], "the regime and crowd signals agree"
+        elif ps.get("regime"):
+            bucket, label = ps["regime"], "the regime signal alone"
+
+        if bucket and bucket.get("lift") is not None:
+            meaning.append(
+                f"Confluence track record: when {label}, the directional call has resolved correctly "
+                f"{bucket['hit_rate'] * 100:.0f}% vs a {bucket['base_rate'] * 100:.0f}% base "
+                f"(lift {bucket['lift']:.2f}x, n={bucket['count']})."
+            )
+            outlook["combined_calibration"] = {"bucket": label, **bucket}
 
     headline = _headline(reg, outlook, close)
 
