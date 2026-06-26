@@ -22,8 +22,11 @@ from analyst.commentary import generate_commentary
 from analyst.config import DB_PATH, DEFAULT_TIMEFRAME
 from analyst.ingestion import make_source
 from analyst.ingestion.sentiment import SentimentClient
+from analyst.levels import key_levels
 from analyst.microstructure import compute_microstructure
 from analyst.scanner import scan_symbols
+
+HIGHER_TF ={"1m": "15m", "5m": "1h", "15m": "1h", "30m": "4h", "1h": "4h", "4h": "1D", "12h": "1D", "1D": "7D"}
 from analyst.features import compute_indicators, snapshot
 from analyst.features.engine import INDICATOR_VERSION
 from analyst.regime import calibrate, classify_latest, classify_series
@@ -157,6 +160,18 @@ def _load_micro(symbol: str) -> dict | None:
                 src.close()
 
     return _cached(("micro", symbol), 30, fetch)
+
+
+def _htf_context(symbol: str, timeframe: str) -> dict | None:
+    """Regime of the next-higher timeframe, for multi-timeframe context."""
+    higher = HIGHER_TF.get(timeframe)
+    if not higher:
+        return None
+    rows = _load_candles(symbol, higher)
+    if len(rows) < 60:
+        return None
+    reg = classify_latest(rows)
+    return {"timeframe": higher, "label": reg.label, "confidence": reg.confidence}
 
 
 def _live_positioning(symbol: str) -> dict | None:
@@ -350,9 +365,10 @@ def commentary(
     if not derivatives and micro and micro.get("funding_rate") is not None:
         derivatives = {"funding_rate": micro["funding_rate"], "open_interest_usd": micro.get("open_interest")}
 
+    htf = _htf_context(symbol, timeframe)
     note = generate_commentary(
         rows, timeframe, micro=micro, sentiment=sentiment_bundle, funding_rows=funding_rows,
-        positioning=positioning, derivatives=derivatives,
+        positioning=positioning, derivatives=derivatives, htf=htf,
     )
     return {"symbol": symbol, "timeframe": timeframe, "as_of": ms_to_iso(rows[-1]["ts"]), **note}
 
@@ -444,5 +460,6 @@ def chart(
         "panels": panels,
         "regime": regime_series,
         "regime_current": regime_current,
+        "levels": key_levels(rows),
         "quality": quality,
     }

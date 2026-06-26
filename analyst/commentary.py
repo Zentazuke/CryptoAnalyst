@@ -17,6 +17,7 @@ import numpy as np
 
 from analyst.crowd import calibrate_funding_contrarian
 from analyst.features import snapshot
+from analyst.levels import key_levels
 from analyst.regime import calibrate, classify_latest
 from analyst.regime import classifier as C
 
@@ -126,6 +127,7 @@ def generate_commentary(
     horizon: int | None = None, sentiment: dict | None = None,
     funding_rows: list[dict] | None = None,
     positioning: dict | None = None, derivatives: dict | None = None,
+    htf: dict | None = None,
 ) -> dict:
     if len(candles) < 60:
         return {
@@ -198,6 +200,24 @@ def generate_commentary(
         elif close < bb_l:
             happening.append(f"Price is below the lower Bollinger band ({_price(bb_l)}) — extended to the downside.")
             meaning.append("Closes below the lower band often see a relief bounce back toward the band middle.")
+
+    # --- structural levels ---
+    levels = key_levels(candles)
+    nr, ns = levels.get("nearest_resistance"), levels.get("nearest_support")
+    if nr:
+        happening.append(
+            f"Nearest resistance ~{_price(nr['price'])} ({', '.join(nr['types'])}; "
+            f"+{nr['dist_pct'] * 100:.1f}%, {nr['dist_atr']:+.1f} ATR away)."
+        )
+    if ns:
+        happening.append(
+            f"Nearest support ~{_price(ns['price'])} ({', '.join(ns['types'])}; "
+            f"{ns['dist_pct'] * 100:.1f}%, {ns['dist_atr']:+.1f} ATR away)."
+        )
+
+    # --- higher-timeframe context ---
+    if htf and htf.get("label"):
+        happening.append(f"Higher timeframe ({htf['timeframe']}) is in {REGIME_TEXT.get(htf['label'], htf['label'])}.")
 
     # --- regime ---
     happening.append(f"The model reads the regime as {REGIME_TEXT.get(reg.label, reg.label)} (confidence {int(reg.confidence * 100)}%).")
@@ -276,6 +296,31 @@ def generate_commentary(
         outlook["crowd_calibration"] = crowd_cal
         if crowd["bias"] != tech_bias and tech_bias in ("bullish", "bearish"):
             outlook["confidence"] = "low" if outlook["confidence"] == "medium" else outlook["confidence"]
+
+    # --- level-anchored targets/invalidation ---
+    if ns or nr:
+        parts = []
+        if ns:
+            parts.append(f"support ~{_price(ns['price'])}")
+        if nr:
+            parts.append(f"resistance ~{_price(nr['price'])}")
+        outlook["text"] += " Levels in play: " + ", ".join(parts) + "."
+        outlook["levels"] = {"support": ns, "resistance": nr}
+        if tech_bias == "bearish" and nr:
+            outlook["invalidation"] = f"A {timeframe} close above ~{_price(nr['price'])} (resistance) would neutralize the bearish lean."
+        elif tech_bias == "bullish" and ns:
+            outlook["invalidation"] = f"A {timeframe} close below ~{_price(ns['price'])} (support) would neutralize the bullish lean."
+
+    # --- higher-timeframe confluence ---
+    if htf and htf.get("label"):
+        htf_bias = BIAS.get(htf["label"], "neutral")
+        outlook["htf"] = htf
+        if htf_bias in ("bullish", "bearish") and tech_bias in ("bullish", "bearish"):
+            if htf_bias != tech_bias:
+                outlook["text"] += f" Note: this is counter-trend to the {htf['timeframe']} ({htf_bias}) — counter-trend moves are lower-probability and often fade."
+                meaning.append(f"The higher timeframe ({htf['timeframe']}) is {htf_bias}, so this {tech_bias} move is counter-trend — treat it cautiously.")
+            else:
+                meaning.append(f"The higher timeframe ({htf['timeframe']}) agrees ({htf_bias}) — timeframes are aligned, a higher-quality backdrop.")
 
     headline = _headline(reg, outlook, close)
 

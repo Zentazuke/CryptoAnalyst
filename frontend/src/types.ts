@@ -41,6 +41,24 @@ export interface RegimeCurrent {
   calibration_horizon: number;
 }
 
+export interface Level {
+  price: number;
+  types: string[];
+  touches: number;
+  dist_pct: number;
+  dist_atr: number;
+}
+
+export interface Levels {
+  price: number | null;
+  atr?: number;
+  support: Level[];
+  resistance: Level[];
+  nearest_support: Level | null;
+  nearest_resistance: Level | null;
+  levels: Level[];
+}
+
 export interface ChartResponse {
   symbol: string;
   timeframe: string;
@@ -54,6 +72,7 @@ export interface ChartResponse {
   panels: Record<string, LinePoint[]>;
   regime: RegimePoint[];
   regime_current: RegimeCurrent;
+  levels: Levels;
   quality: QualityCheck | null;
 }
 

@@ -68,6 +68,16 @@ export function Dashboard({ data }: { data: ChartResponse }) {
     overlay("sma_20", "#58a6ff", 2);
     overlay("ema_20", "#e3b341", 2);
 
+    // --- structural support / resistance levels ---
+    const drawLevel = (lvl: { price: number; types: string[] }, color: string) => {
+      candles.createPriceLine({
+        price: lvl.price, color, lineStyle: LineStyle.Dashed, lineWidth: 1,
+        axisLabelVisible: true, title: lvl.types[0] ?? "",
+      });
+    };
+    (data.levels?.support ?? []).slice(0, 3).forEach((l) => drawLevel(l, "#2e7d46"));
+    (data.levels?.resistance ?? []).slice(0, 3).forEach((l) => drawLevel(l, "#b3433b"));
+
     // --- regime ribbon: one colored bar per candle ---
     const ribbon = regime.addHistogramSeries({ priceLineVisible: false, lastValueVisible: false });
     ribbon.setData(
