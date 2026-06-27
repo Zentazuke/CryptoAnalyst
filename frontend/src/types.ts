@@ -100,11 +100,29 @@ export interface MetricRead {
   outlook: string;
 }
 
+export interface EnsembleSignal {
+  weight: number;
+  call: number;
+  contribution: number;
+  train_acc: number | null;
+  train_n: number;
+}
+
+export interface EnsembleRead {
+  horizon: number;
+  lean: string;
+  score: number;
+  normalized: number;
+  signals: Record<string, EnsembleSignal>;
+  calibration: { n: number; acc: number; base: number; lift: number | null } | null;
+}
+
 export interface Commentary {
   symbol: string;
   timeframe: string;
   as_of: string;
   metric_reads?: MetricRead[];
+  ensemble?: EnsembleRead | null;
   headline: string;
   whats_happening: string[];
   what_it_means: string[];

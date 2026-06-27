@@ -20,6 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from analyst.commentary import DEFAULT_HORIZON, generate_commentary
 from analyst.metric_reads import metric_reads
+from analyst.ensemble import ensemble_read
 from analyst.config import DB_PATH, DEFAULT_TIMEFRAME, INTERVAL_SECONDS
 from analyst.outlook_calibration import calibrate_combined
 from analyst.ingestion import make_source
@@ -561,8 +562,27 @@ def commentary(
         rows, timeframe, micro=micro, sentiment=sentiment_bundle, funding_rows=funding_rows,
         positioning=positioning, derivatives=derivatives, htf=htf, onchain=onchain, horizon=horizon,
     )
+    # calibrated directional ensemble (weighted lean + out-of-sample track record)
+    ens = _cached(("ensemble", symbol, timeframe), 1800, lambda: ensemble_read(rows, timeframe))
     return {"symbol": symbol, "timeframe": timeframe, "as_of": ms_to_iso(rows[-1]["ts"]),
-            "metric_reads": reads, **note}
+            "metric_reads": reads, "ensemble": ens, **note}
+
+
+@app.get("/ensemble/{symbol}")
+def ensemble(
+    symbol: str,
+    timeframe: str = Query(default=DEFAULT_TIMEFRAME),
+) -> dict:
+    """Calibrated directional ensemble: the current weighted lean across the
+    candle-derived signals, each weighted by its measured edge, with an honest
+    out-of-sample track record. Built for the dashboard and the future bot."""
+    rows = _load_candles(symbol, timeframe)
+    if not rows:
+        raise HTTPException(status_code=404, detail=f"no {timeframe} data for {symbol}")
+    read = _cached(("ensemble", symbol, timeframe), 1800, lambda: ensemble_read(rows, timeframe))
+    if read is None:
+        raise HTTPException(status_code=422, detail="not enough history for the ensemble")
+    return {"symbol": symbol, "timeframe": timeframe, "as_of": ms_to_iso(rows[-1]["ts"]), **read}
 
 
 def _line(times: list[int], arr) -> list[dict]:

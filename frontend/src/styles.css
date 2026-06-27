@@ -243,6 +243,23 @@ header.app-head {
 
 .commentary-caveat { margin: 12px 0 0; font-size: 11.5px; color: var(--muted); font-style: italic; }
 
+/* Directional ensemble */
+.ensemble { margin-bottom: 16px; }
+.ens-headline { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.ens-lean { font-size: 22px; font-weight: 700; text-transform: capitalize; }
+.ens-badge { font-size: 11.5px; font-weight: 600; padding: 2px 10px; border: 1px solid; border-radius: 999px; }
+.ens-meter { position: relative; height: 10px; background: var(--border); border-radius: 999px; overflow: hidden; }
+.ens-meter-mid { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--muted); opacity: 0.6; }
+.ens-meter-fill { position: absolute; top: 0; bottom: 0; border-radius: 999px; }
+.ens-meter-labels { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--muted); margin: 4px 2px 0; }
+.ens-track { font-size: 13px; line-height: 1.5; margin: 12px 0; }
+.ens-signals { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 6px 16px; margin: 10px 0; }
+.ens-sig { display: grid; grid-template-columns: 84px 14px 1fr; align-items: center; gap: 6px; font-size: 12px; }
+.ens-sig-name { color: var(--text); }
+.ens-sig-dir { text-align: center; font-size: 10px; }
+.ens-sig-wt { height: 6px; border-radius: 999px; min-width: 2px; }
+.ens-foot { font-size: 11px; line-height: 1.45; margin: 6px 0 0; font-style: italic; }
+
 /* Per-metric analyst breakdown */
 .metric-grid {
   display: grid;

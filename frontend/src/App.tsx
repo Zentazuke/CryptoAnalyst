@@ -9,6 +9,7 @@ import { RegimeCard } from "./components/RegimeCard";
 import { MicrostructureCard } from "./components/MicrostructureCard";
 import { CommentaryCard } from "./components/CommentaryCard";
 import { MetricBreakdown } from "./components/MetricBreakdown";
+import { EnsembleCard } from "./components/EnsembleCard";
 import { SentimentCard } from "./components/SentimentCard";
 import { MarketScanCard } from "./components/MarketScanCard";
 import { AlertsCard } from "./components/AlertsCard";
@@ -174,6 +175,12 @@ export default function App() {
           onSimulate={simulate}
         />
       </ErrorBoundary>
+
+      {note?.ensemble && (
+        <ErrorBoundary name="Ensemble">
+          <EnsembleCard ens={note.ensemble} timeframe={timeframe} />
+        </ErrorBoundary>
+      )}
 
       {note?.metric_reads && note.metric_reads.length > 0 && (
         <Section title="Analyst breakdown" subtitle="each metric read on its own — what it shows, means & where it points">

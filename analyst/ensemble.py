@@ -117,3 +117,70 @@ def ensemble_calls(signals: dict[str, np.ndarray], weights: dict[str, dict]):
     out[score > 0] = 1.0
     out[score < 0] = -1.0
     return out, score
+
+
+def directional_accuracy(call: np.ndarray, eligible: np.ndarray, up: np.ndarray) -> dict | None:
+    """Accuracy vs the majority-class baseline over called+eligible bars."""
+    m = eligible & (call != 0)
+    n = int(m.sum())
+    if n == 0:
+        return None
+    acc = float(np.mean((call[m] > 0) == up[m]))
+    up_rate = float(np.mean(up[m]))
+    base = max(up_rate, 1 - up_rate)
+    return {"n": n, "acc": round(acc, 4), "base": round(base, 4),
+            "lift": round(acc / base, 3) if base else None}
+
+
+def ensemble_read(candles, timeframe: str, horizon: int | None = None,
+                  train_frac: float = 0.6) -> dict | None:
+    """The current weighted directional lean, with its out-of-sample track record.
+
+    Weights for the live lean are learned from all *resolved* history (causal —
+    each weight uses only past forward-outcomes). The track record is measured
+    walk-forward: weights learned on the early `train_frac`, scored on the held-
+    out remainder, so the reported lift is honest out-of-sample.
+    """
+    from analyst.commentary import DEFAULT_HORIZON
+
+    n = len(candles)
+    if n < 250:
+        return None
+    horizon = horizon or DEFAULT_HORIZON.get(timeframe, 12)
+    signals = directional_signals(candles)
+    up, significant, valid = forward_outcome(candles, horizon)
+    idx = np.arange(n)
+    elig_all = valid & significant
+
+    weights = learn_weights(signals, up, elig_all)
+    _, score_arr = ensemble_calls(signals, weights)
+
+    # honest out-of-sample track record for this ensemble
+    split = int(n * train_frac)
+    w_train = learn_weights(signals, up, elig_all & (idx < split - horizon))
+    test_call, _ = ensemble_calls(signals, w_train)
+    track = directional_accuracy(test_call, elig_all & (idx >= split), up)
+
+    last = n - 1
+    contributions: dict[str, dict] = {}
+    active_abs = 0.0
+    for name, arr in signals.items():
+        c = float(arr[last])
+        w = weights[name]["weight"]
+        if c != 0:
+            active_abs += abs(w)
+        contributions[name] = {
+            "weight": round(w, 3), "call": c, "contribution": round(w * c, 3),
+            "train_acc": weights[name]["train_acc"], "train_n": weights[name]["train_n"],
+        }
+    score = float(score_arr[last])
+    norm = score / active_abs if active_abs > 0 else 0.0
+    lean = "bullish" if score > 0 else "bearish" if score < 0 else "neutral"
+    return {
+        "horizon": horizon,
+        "lean": lean,
+        "score": round(score, 3),
+        "normalized": round(norm, 3),  # -1..1: agreement of the active signals
+        "signals": contributions,
+        "calibration": track,  # {n, acc, base, lift} out-of-sample, or None
+    }
