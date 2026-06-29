@@ -1,5 +1,18 @@
-import type { RegimeCurrent } from "../types";
+import type { Calibration, RegimeCurrent } from "../types";
 import { regimeColor, regimeLabel } from "../regime";
+
+/** A small badge stating whether the measured edge is statistically real. */
+function CalVerdict({ verdict }: { verdict: NonNullable<Calibration["verdict"]> }) {
+  const map: Record<string, { txt: string; cls: string }> = {
+    edge: { txt: "significant edge", cls: "good-txt" },
+    negative: { txt: "significantly worse", cls: "bad-txt" },
+    "no-edge": { txt: "no clear edge", cls: "muted-txt" },
+    insufficient: { txt: "insufficient sample", cls: "muted-txt" },
+    "no-data": { txt: "no data", cls: "muted-txt" },
+  };
+  const v = map[verdict] ?? map["no-data"];
+  return <span className={v.cls}> · {v.txt}</span>;
+}
 
 /** Current regime call: state, confidence, why, and how reliable that call has
  *  been historically (calibration lift from the backend). */
@@ -37,12 +50,16 @@ export function RegimeCard({ regime, timeframe }: { regime: RegimeCurrent; timef
             <span className="cal-title">historical reliability</span>
             <span className="cal-detail">
               when called <b style={{ color }}>{regimeLabel(regime.label)}</b>, resolved as
-              expected <b>{(cal.hit_rate * 100).toFixed(0)}%</b> of the time vs{" "}
-              <b>{(cal.base_rate * 100).toFixed(0)}%</b> base
+              expected <b>{(cal.hit_rate * 100).toFixed(0)}%</b>
+              {cal.ci_low != null && cal.ci_high != null && (
+                <span className="muted-txt"> ({(cal.ci_low * 100).toFixed(0)}–{(cal.ci_high * 100).toFixed(0)}% CI)</span>
+              )}{" "}
+              vs <b>{(cal.base_rate * 100).toFixed(0)}%</b> base
               {cal.lift != null && (
-                <> · lift <b className={cal.lift >= 1 ? "good-txt" : "muted-txt"}>{cal.lift.toFixed(2)}×</b></>
+                <> · lift <b className={cal.significant ? (cal.verdict === "edge" ? "good-txt" : "bad-txt") : "muted-txt"}>{cal.lift.toFixed(2)}×</b></>
               )}{" "}
               <span className="muted-txt">(n={cal.count}, h={regime.calibration_horizon})</span>
+              {cal.verdict && <CalVerdict verdict={cal.verdict} />}
             </span>
           </>
         ) : (

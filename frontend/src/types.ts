@@ -29,6 +29,10 @@ export interface Calibration {
   hit_rate: number | null;
   base_rate: number | null;
   lift: number | null;
+  ci_low?: number | null;
+  ci_high?: number | null;
+  significant?: boolean;
+  verdict?: "edge" | "negative" | "no-edge" | "insufficient" | "no-data";
 }
 
 export interface RegimeCurrent {
@@ -108,13 +112,27 @@ export interface EnsembleSignal {
   train_n: number;
 }
 
+export interface Evidence {
+  n: number;
+  hit_rate: number | null;
+  ci_low: number | null;
+  ci_high: number | null;
+  base_rate: number | null;
+  lift: number | null;
+  lift_ci_low: number | null;
+  lift_ci_high: number | null;
+  p_value: number | null;
+  significant: boolean;
+  verdict: "edge" | "negative" | "no-edge" | "insufficient" | "no-data";
+}
+
 export interface EnsembleRead {
   horizon: number;
   lean: string;
   score: number;
   normalized: number;
   signals: Record<string, EnsembleSignal>;
-  calibration: { n: number; acc: number; base: number; lift: number | null } | null;
+  calibration: Evidence | null;
 }
 
 export interface Commentary {

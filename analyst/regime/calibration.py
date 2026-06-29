@@ -24,6 +24,7 @@ from typing import Any
 
 import numpy as np
 
+from analyst import stats
 from analyst.features import indicators as ind
 from analyst.regime import classifier as C
 
@@ -113,11 +114,17 @@ def calibrate(
         hit_rate = hits[lab] / c if c else None
         base_rate = base_occ[lab] / base_total if base_total else None
         lift = (hit_rate / base_rate) if (hit_rate is not None and base_rate) else None
+        # attach a CI + significance verdict so a thin sample reads honestly
+        ev = stats.evidence(hits[lab], c, base_rate)
         report[lab] = {
             "count": c,
             "hit_rate": round(hit_rate, 4) if hit_rate is not None else None,
             "base_rate": round(base_rate, 4) if base_rate is not None else None,
             "lift": round(lift, 3) if lift is not None else None,
+            "ci_low": ev["ci_low"],
+            "ci_high": ev["ci_high"],
+            "significant": ev["significant"],
+            "verdict": ev["verdict"],
         }
 
     return {

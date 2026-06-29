@@ -21,14 +21,19 @@ const SIGNAL_LABEL: Record<string, string> = {
 export function EnsembleCard({ ens, timeframe }: { ens: EnsembleRead; timeframe: string }) {
   const color = LEAN_COLOR[ens.lean] ?? "#8b949e";
   const cal = ens.calibration;
-  const lift = cal?.lift ?? null;
 
-  // the track record decides the framing, not the lean itself
+  // significance (CI vs base rate) decides the framing, not the point estimate
+  const liftTxt = cal?.lift != null ? `lift ${cal.lift.toFixed(2)}` : "";
   const edge =
-    lift == null ? { txt: "not enough history to calibrate", tone: "#8b949e", trust: false }
-    : lift >= 1.05 ? { txt: `measured edge (lift ${lift.toFixed(2)})`, tone: "#3fb950", trust: true }
-    : lift >= 0.95 ? { txt: `no clear edge (lift ${lift.toFixed(2)})`, tone: "#d29922", trust: false }
-    : { txt: `no edge on ${timeframe} (lift ${lift.toFixed(2)}) — treat as noise`, tone: "#f85149", trust: false };
+    cal == null || cal.verdict === "no-data"
+      ? { txt: "not enough history to calibrate", tone: "#8b949e", trust: false }
+    : cal.verdict === "insufficient"
+      ? { txt: `insufficient evidence (n=${cal.n})`, tone: "#8b949e", trust: false }
+    : cal.verdict === "edge"
+      ? { txt: `measured edge (${liftTxt}, 95% CI excludes base)`, tone: "#3fb950", trust: true }
+    : cal.verdict === "negative"
+      ? { txt: `significantly worse than chance on ${timeframe} (${liftTxt})`, tone: "#f85149", trust: false }
+      : { txt: `no statistically clear edge on ${timeframe} (${liftTxt})`, tone: "#d29922", trust: false };
 
   const pct = Math.max(-1, Math.min(1, ens.normalized));
   const fillLeft = pct >= 0 ? 50 : 50 + pct * 50;
@@ -56,13 +61,16 @@ export function EnsembleCard({ ens, timeframe }: { ens: EnsembleRead; timeframe:
       </div>
       <div className="ens-meter-labels"><span>bearish</span><span>signal agreement</span><span>bullish</span></div>
 
-      {cal && (
+      {cal && cal.hit_rate != null && (
         <p className="ens-track">
           Out-of-sample: when this leaned a direction it was right{" "}
-          <b style={{ color: edge.tone }}>{(cal.acc * 100).toFixed(0)}%</b> vs a {(cal.base * 100).toFixed(0)}% baseline
-          {" "}(n={cal.n}). {edge.trust
-            ? "A real, measured edge on this timeframe."
-            : "Not a reliable directional call on this timeframe — weight it accordingly."}
+          <b style={{ color: edge.tone }}>{(cal.hit_rate * 100).toFixed(0)}%</b>
+          {cal.ci_low != null && cal.ci_high != null && (
+            <span className="muted-txt"> (95% CI {(cal.ci_low * 100).toFixed(0)}–{(cal.ci_high * 100).toFixed(0)}%)</span>
+          )}{" "}
+          vs a {((cal.base_rate ?? 0) * 100).toFixed(0)}% baseline (n={cal.n}). {edge.trust
+            ? "The interval excludes the baseline — a real, measured edge here."
+            : "The interval includes the baseline — not a reliable directional call on this timeframe; weight it accordingly."}
         </p>
       )}
 

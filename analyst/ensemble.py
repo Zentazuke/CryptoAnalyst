@@ -20,6 +20,7 @@ import numpy as np
 from analyst.features import indicators as I
 from analyst.features.engine import compute_indicators
 from analyst.regime import classifier as C
+from analyst.stats import evidence
 
 MOVE_K = 1.0  # vol-scaled significance multiplier (matches the regime calibrator)
 
@@ -120,16 +121,16 @@ def ensemble_calls(signals: dict[str, np.ndarray], weights: dict[str, dict]):
 
 
 def directional_accuracy(call: np.ndarray, eligible: np.ndarray, up: np.ndarray) -> dict | None:
-    """Accuracy vs the majority-class baseline over called+eligible bars."""
+    """Accuracy vs the majority-class baseline, with a confidence interval and a
+    significance verdict (so a thin/noisy sample can't pass as an edge)."""
     m = eligible & (call != 0)
     n = int(m.sum())
     if n == 0:
         return None
-    acc = float(np.mean((call[m] > 0) == up[m]))
+    hits = int(np.sum((call[m] > 0) == up[m]))
     up_rate = float(np.mean(up[m]))
-    base = max(up_rate, 1 - up_rate)
-    return {"n": n, "acc": round(acc, 4), "base": round(base, 4),
-            "lift": round(acc / base, 3) if base else None}
+    base = max(up_rate, 1 - up_rate)  # majority-class baseline accuracy
+    return evidence(hits, n, base)
 
 
 def ensemble_read(candles, timeframe: str, horizon: int | None = None,
