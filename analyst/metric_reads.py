@@ -282,7 +282,8 @@ def metric_reads(
             ("Resting bids outweigh asks — short-term support, though book imbalance is shallow and can flip in "
              "seconds." if mbias == "bullish" else
              "Resting asks outweigh bids — short-term overhead supply, but it's a fast-moving, shallow signal." if mbias == "bearish" else
-             "Book is balanced — no near-term order-flow edge; treat this as liquidity context, not direction."),
+             "Book is balanced — no near-term order-flow edge; treat this as liquidity context, not direction.")
+            + " (Point-in-time signal — not yet calibrated over history; snapshots are accruing.)",
         ))
 
     # ── Positioning & derivatives (crowd) ─────────────────────────────────
@@ -348,14 +349,24 @@ def metric_reads(
             if at is not None:
                 reading = (f"Active addresses {at * 100:+.0f}% over 30d"
                            + (f" ({pctl * 100:.0f}th percentile of the 90d range)." if pctl is not None else "."))
+            # measured track record for the divergence signal on this asset
+            cal = onchain.get("divergence_calibration")
+            track = ""
+            if cal and cal.get("hit_rate") is not None:
+                if cal.get("verdict") == "edge":
+                    track = (f" Measured: this divergence has led price correctly {cal['hit_rate'] * 100:.0f}% "
+                             f"vs a {cal['base_rate'] * 100:.0f}% base (n={cal['n']}) — a statistically significant edge.")
+                else:
+                    track = (f" Measured: {cal['hit_rate'] * 100:.0f}% vs {cal['base_rate'] * 100:.0f}% base "
+                             f"(n={cal['n']}) — within noise, no significant edge on this asset.")
             if div == "bullish":
                 obias = "bullish"
                 mean = "Network activity is rising while price falls — a bullish divergence suggesting accumulation/usage is building."
-                out = "Constructive divergences often precede a price catch-up, but on-chain is slow-moving — it's a backdrop, not a trigger."
+                out = "Constructive divergences often precede a price catch-up, but on-chain is slow-moving — it's a backdrop, not a trigger." + track
             elif div == "bearish":
                 obias = "bearish"
                 mean = "Activity is fading while price rises — a lower-quality rally that can run out of fuel."
-                out = "Watch for price to converge down to weakening fundamentals; on-chain leads slowly, so allow time."
+                out = "Watch for price to converge down to weakening fundamentals; on-chain leads slowly, so allow time." + track
             else:
                 obias = "neutral"
                 mean = "Network usage is tracking price — no divergence to exploit."

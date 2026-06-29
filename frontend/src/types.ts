@@ -282,6 +282,7 @@ export interface OnChain {
   tx_trend_30d?: number | null;
   price_trend_30d?: number | null;
   divergence?: string;
+  divergence_calibration?: Evidence | null;
 }
 
 export interface MicroSnapshot {

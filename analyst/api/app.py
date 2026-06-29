@@ -30,6 +30,7 @@ from analyst.alert_calibration import aggregate_track_records, calibrate_alerts
 from analyst.alerts import detect_alerts
 from analyst.microstructure import compute_microstructure
 from analyst.onchain import onchain_snapshot
+from analyst.onchain_calibration import calibrate_onchain_divergence
 from analyst.scanner import scan_symbols
 from analyst.storage.journal import AlertJournal
 from analyst.vol import implied_vol_context
@@ -231,8 +232,14 @@ def _load_micro(symbol: str) -> dict | None:
 
 
 def _load_onchain(symbol: str) -> dict | None:
-    """On-chain network-activity snapshot (cached ~1h; daily data)."""
-    return _cached(("onchain", symbol), 3600, lambda: onchain_snapshot(symbol))
+    """On-chain network-activity snapshot (cached ~1h; daily data), with the
+    divergence signal's measured forward edge attached (cached ~6h; heavy)."""
+    snap = _cached(("onchain", symbol), 3600, lambda: onchain_snapshot(symbol))
+    if not snap:
+        return snap
+    cal = _cached(("onchain_cal", symbol), 6 * 3600,
+                  lambda: calibrate_onchain_divergence(symbol, horizon=10))
+    return {**snap, "divergence_calibration": cal}
 
 
 def _htf_context(symbol: str, timeframe: str) -> dict | None:

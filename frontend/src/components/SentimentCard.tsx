@@ -130,8 +130,11 @@ export function SentimentCard({ sentiment }: { sentiment: Sentiment | null }) {
         <Stat label="BTC dominance" value={num(ctx.btc_dominance_pct, 1, "%")} hint="BTC share of total crypto market cap" />
         <Stat label="Mkt cap 24h" value={signed(ctx.market_cap_change_24h_pct, 1, "%")} color={signColor(ctx.market_cap_change_24h_pct)} hint="total crypto market cap change, 24h" />
         <Stat label="Outlook conf." value={pct(ol.confidence)} hint="engine's confidence in its directional read" />
-        <Stat label="6h up-prob" value={pct(dp)} color={dp == null ? undefined : dp >= 0.5 ? "#3fb950" : "#f85149"} hint="modeled probability price is higher in 6h" />
+        <Stat label="6h up-prob" value={pct(dp)} color={dp == null ? undefined : dp >= 0.5 ? "#3fb950" : "#f85149"} hint="modeled probability price is higher in 6h — live-only source, not yet calibrated over history" />
       </div>
+      <p className="sent-hint" style={{ margin: "2px 2px 0" }}>
+        Note: the engine's 6h up-probability comes from a live-only feed, so it carries no historical track record yet — treat it as context, not a measured edge.
+      </p>
 
       <SubHead title="Social & news activity" hint="what the crowd is saying right now" />
       <div className="stat-grid">

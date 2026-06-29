@@ -22,6 +22,7 @@ export function OnChainCard({ onchain }: { onchain: OnChain | null }) {
     );
   }
   const div = onchain.divergence ?? "none";
+  const cal = onchain.divergence_calibration;
   return (
     <div className="card">
       <div className="card-title">On-chain · network activity</div>
@@ -31,6 +32,17 @@ export function OnChainCard({ onchain }: { onchain: OnChain | null }) {
             ? "Bullish divergence: activity rising while price falls"
             : "Bearish divergence: activity fading while price rises"}
         </div>
+      )}
+      {cal && cal.hit_rate != null && (
+        <p className="muted-txt" style={{ fontSize: 11.5, margin: "0 0 10px" }}>
+          {cal.verdict === "edge" ? (
+            <span style={{ color: "#3fb950" }}>
+              Measured edge: divergence led price correctly {(cal.hit_rate * 100).toFixed(0)}% vs {((cal.base_rate ?? 0) * 100).toFixed(0)}% base (n={cal.n}, CI excludes baseline).
+            </span>
+          ) : (
+            <>Measured: {(cal.hit_rate * 100).toFixed(0)}% vs {((cal.base_rate ?? 0) * 100).toFixed(0)}% base (n={cal.n}) — within noise, no significant edge on this asset.</>
+          )}
+        </p>
       )}
       <div className="stat-grid">
         <Stat label="Active addresses" value={compact(onchain.active_addresses)} />
