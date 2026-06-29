@@ -1,4 +1,4 @@
-import type { AlertJournalResponse, AlertsResponse, ChartResponse, Commentary, MicroSnapshot, OnChain, ScanResponse, Sentiment } from "./types";
+import type { AlertJournalResponse, AlertsResponse, ChartResponse, Commentary, DataHealth, MicroSnapshot, OnChain, ScanResponse, Sentiment } from "./types";
 
 // Same-origin: the dev server proxies "/api" -> the analyst API (see
 // vite.config.ts). This sidesteps browser CORS and IPv4/IPv6 loopback issues.
@@ -95,6 +95,14 @@ export async function fetchAlertJournal(limit = 40): Promise<AlertJournalRespons
 export async function fetchOnchain(symbol: string): Promise<OnChain | null> {
   try {
     return await getJSON<OnChain>(`/onchain/${encodeURIComponent(symbol)}`);
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchDataHealth(): Promise<DataHealth | null> {
+  try {
+    return await getJSON<DataHealth>(`/data-health`);
   } catch {
     return null;
   }

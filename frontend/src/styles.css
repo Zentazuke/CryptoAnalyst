@@ -64,6 +64,17 @@ header.app-head {
 
 .controls button:hover { border-color: var(--accent); }
 
+/* Data-health strip */
+.health-bar {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 7px 14px; margin-bottom: 12px; font-size: 12.5px;
+  border: 1px solid var(--border); border-radius: 8px; background: var(--panel);
+}
+.health-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.health-label { font-weight: 650; }
+.health-meta { color: var(--muted); }
+.health-spacer { flex: 1; }
+
 /* Trust bar */
 .trustbar {
   display: flex;

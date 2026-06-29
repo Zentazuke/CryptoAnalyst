@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { fetchChart, fetchMicro, fetchCommentary, fetchSentiment, fetchScan, fetchOnchain, fetchAlerts, fetchAlertJournal, API_BASE } from "./api";
-import type { AlertJournalResponse, AlertsResponse, ChartResponse, Commentary, MicroSnapshot, OnChain, ScanResponse, Sentiment } from "./types";
+import { fetchChart, fetchMicro, fetchCommentary, fetchSentiment, fetchScan, fetchOnchain, fetchAlerts, fetchAlertJournal, fetchDataHealth, API_BASE } from "./api";
+import type { AlertJournalResponse, AlertsResponse, ChartResponse, Commentary, DataHealth, MicroSnapshot, OnChain, ScanResponse, Sentiment } from "./types";
+import { DataHealthBar } from "./components/DataHealthBar";
 import { Controls } from "./components/Controls";
 import { TrustBar } from "./components/TrustBar";
 import { Section } from "./components/Section";
@@ -52,6 +53,7 @@ export default function App() {
   const [scan, setScan] = useState<ScanResponse | null>(null);
   const [alerts, setAlerts] = useState<AlertsResponse | null>(null);
   const [journal, setJournal] = useState<AlertJournalResponse | null>(null);
+  const [health, setHealth] = useState<DataHealth | null>(null);
   const [scanLoading, setScanLoading] = useState(false);
 
   const loadScan = useCallback(() => {
@@ -110,6 +112,14 @@ export default function App() {
     fetchOnchain(symbol).then(setOnchain).catch(() => setOnchain(null));
   }, [symbol]);
 
+  // Data-health: poll independently so liveness is always current (every 20s).
+  useEffect(() => {
+    const tick = () => fetchDataHealth().then(setHealth).catch(() => {});
+    tick();
+    const id = setInterval(tick, 20000);
+    return () => clearInterval(id);
+  }, []);
+
   // Drop the stale note when the instrument/timeframe changes so the card never
   // shows a read that no longer matches what you're looking at.
   useEffect(() => {
@@ -162,6 +172,8 @@ export default function App() {
           onAuto={setAuto}
         />
       </header>
+
+      <DataHealthBar health={health} />
 
       {/* ── The synthesized read, up top: everything condensed and analysed ── */}
       {data && <TrustBar data={data} timeframe={timeframe} />}

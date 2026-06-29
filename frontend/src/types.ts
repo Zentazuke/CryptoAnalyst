@@ -3,6 +3,29 @@ export interface LinePoint {
   value: number;
 }
 
+export interface FeedHealth {
+  symbol: string;
+  timeframe: string;
+  last_candle: string | null;
+  age_seconds: number | null;
+  stale: boolean;
+}
+
+export interface SchedulerTask {
+  name: string;
+  interval_s: number;
+  runs: number;
+  errors: number;
+  last_run: number;
+}
+
+export interface DataHealth {
+  status: "ok" | "degraded" | "stale";
+  now: string;
+  feeds: FeedHealth[];
+  scheduler: { enabled: boolean; running: boolean; errors: number; tasks: SchedulerTask[] };
+}
+
 export interface Candle {
   time: number;
   open: number;

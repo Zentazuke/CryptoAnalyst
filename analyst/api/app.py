@@ -21,7 +21,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from analyst.commentary import DEFAULT_HORIZON, generate_commentary
 from analyst.metric_reads import metric_reads
 from analyst.ensemble import ensemble_read
-from analyst.config import DB_PATH, DEFAULT_TIMEFRAME, INTERVAL_SECONDS, SCHEDULER_ENABLED
+from analyst.config import (
+    DB_PATH, DEFAULT_TIMEFRAME, INTERVAL_SECONDS, SCHEDULER_ENABLED,
+    SCHEDULER_SYMBOLS, SCHEDULER_TIMEFRAMES,
+)
+from analyst.health import freshness, overall_status
 from analyst.outlook_calibration import calibrate_combined
 from analyst.ingestion import make_source
 from analyst.ingestion.sentiment import SentimentClient
@@ -102,6 +106,39 @@ def scheduler_status() -> dict:
     if _scheduler is None:
         return {"enabled": False, "detail": "scheduler off (set ANALYST_SCHEDULER=1 to enable)"}
     return {"enabled": True, **_scheduler.status()}
+
+
+@app.get("/data-health")
+def data_health() -> dict:
+    """One-call liveness view: per-feed freshness + collector health + a rolled-up
+    status, so the dashboard can fail loud instead of showing stale data as live."""
+    now = now_ms()
+    symbols = SCHEDULER_SYMBOLS or ["BTC_USDT", "ETH_USDT"]
+    timeframes = SCHEDULER_TIMEFRAMES or ["1h", "4h", "1D"]
+    items = []
+    for sym in symbols:
+        for tf in timeframes:
+            try:
+                rows = store().get_candles(sym, tf, limit=1)
+                last = rows[0]["ts"] if rows else None
+            except Exception:
+                last = None
+            fr = freshness(last, INTERVAL_SECONDS.get(tf, 3600), now)
+            items.append({"symbol": sym, "timeframe": tf,
+                          "last_candle": ms_to_iso(last) if last else None, **fr})
+    sched = _scheduler.status() if _scheduler is not None else {"running": False, "tasks": []}
+    sched_errors = sum(t.get("errors", 0) for t in sched.get("tasks", []))
+    return {
+        "status": overall_status(items, sched_errors),
+        "now": ms_to_iso(now),
+        "feeds": items,
+        "scheduler": {
+            "enabled": _scheduler is not None,
+            "running": sched.get("running", False),
+            "errors": sched_errors,
+            "tasks": sched.get("tasks", []),
+        },
+    }
 
 
 _live_cache: dict[tuple, tuple[float, list[dict]]] = {}
