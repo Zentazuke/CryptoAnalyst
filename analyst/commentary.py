@@ -112,6 +112,17 @@ def _crowd_read(pos: dict | None, dv: dict | None) -> dict | None:
             "bias": None, "summary": "balanced"}
 
 
+def _sig_suffix(d: dict | None) -> str:
+    """A short clause stating whether a measured edge is statistically real."""
+    v = (d or {}).get("verdict")
+    return {
+        "edge": " — statistically significant.",
+        "negative": " — but historically worse than chance, so treat with caution.",
+        "insufficient": " — but the sample is too small to trust yet.",
+        "no-edge": " — but within noise, not statistically significant.",
+    }.get(v, ".")
+
+
 def _sentiment_bias(label: str | None) -> str:
     if not label:
         return "neutral"
@@ -252,7 +263,8 @@ def generate_commentary(
             meaning.append(
                 f"Measured: funding-crowding has been contrarian {crowd_cal['hit_rate'] * 100:.0f}% "
                 f"of the time vs a {crowd_cal['base_rate'] * 100:.0f}% base "
-                f"(lift {crowd_cal['lift']:.2f}x, n={crowd_cal['count']} over ~{crowd_cal['span_days']:.0f}d)."
+                f"(lift {crowd_cal['lift']:.2f}x, n={crowd_cal['count']} over ~{crowd_cal['span_days']:.0f}d)"
+                + _sig_suffix(crowd_cal)
             )
 
     # --- sentiment & context (from the sentiment engine, if available) ---
@@ -363,7 +375,8 @@ def generate_commentary(
             meaning.append(
                 f"Confluence track record: when {label}, the directional call has resolved correctly "
                 f"{bucket['hit_rate'] * 100:.0f}% vs a {bucket['base_rate'] * 100:.0f}% base "
-                f"(lift {bucket['lift']:.2f}x, n={bucket['count']})."
+                f"(lift {bucket['lift']:.2f}x, n={bucket['count']})"
+                + _sig_suffix(bucket)
             )
             outlook["combined_calibration"] = {"bucket": label, **bucket}
 
@@ -416,16 +429,31 @@ def _outlook(reg, cal, horizon, timeframe, close, ema, bb_m, bb_u, bb_l, chg) ->
     tfh = TF_HOURS.get(timeframe, 1)
     window = _dur(horizon * tfh)
 
-    # calibration-grounded odds phrasing
+    # calibration-grounded odds phrasing — driven by statistical significance
+    # (does the 95% CI exclude the base rate?), not a raw lift threshold.
     if cal and cal.get("hit_rate") is not None and cal.get("base_rate") is not None:
         hit = cal["hit_rate"] * 100
         base = cal["base_rate"] * 100
         lift = cal.get("lift")
-        if lift and lift >= 1.15:
-            edge = f"about {hit:.0f}% of the time vs a {base:.0f}% base rate (lift {lift:.2f}× — a modest but real historical edge)"
-            conf = "medium" if lift >= 1.3 and reg.confidence >= 0.3 else "low-to-medium"
-        else:
-            edge = f"about {hit:.0f}% of the time, barely better than the {base:.0f}% base rate (little measured edge here)"
+        verdict = cal.get("verdict")
+        ci = ""
+        if cal.get("ci_low") is not None and cal.get("ci_high") is not None:
+            ci = f", 95% CI {cal['ci_low'] * 100:.0f}–{cal['ci_high'] * 100:.0f}%"
+        if verdict == "edge":
+            edge = (f"about {hit:.0f}% of the time vs a {base:.0f}% base rate "
+                    f"(lift {lift:.2f}×{ci} — a statistically significant edge)")
+            conf = "medium" if (lift and lift >= 1.3 and reg.confidence >= 0.3) else "low-to-medium"
+        elif verdict == "negative":
+            edge = (f"about {hit:.0f}% of the time vs a {base:.0f}% base rate{ci} — historically "
+                    f"*worse* than chance, a caution against taking this at face value")
+            conf = "low"
+        elif verdict == "insufficient":
+            edge = (f"about {hit:.0f}% vs a {base:.0f}% base rate, but on too small a sample "
+                    f"(n={cal.get('count')}) to trust")
+            conf = "low"
+        else:  # no-edge: CI straddles the base rate
+            edge = (f"about {hit:.0f}% of the time vs a {base:.0f}% base rate{ci} — within noise, "
+                    f"no statistically measured edge")
             conf = "low"
     else:
         edge = "with too few historical samples to estimate reliably"

@@ -15,6 +15,7 @@ from typing import Any
 
 import numpy as np
 
+from analyst import stats
 from analyst.regime.derivatives import align_funding
 from analyst.regime.features import _rolling_pctl_rank
 
@@ -65,6 +66,7 @@ def calibrate_funding_contrarian(
     lift = hit_rate / base_rate if base_rate > 0 else None
     span_days = (ts[-1] - ts[0]) / 86_400_000.0
 
+    ev = stats.evidence(hits, crowd_n, base_rate)
     return {
         "horizon": horizon,
         "count": crowd_n,
@@ -72,4 +74,8 @@ def calibrate_funding_contrarian(
         "base_rate": round(base_rate, 4),
         "lift": round(lift, 3) if lift is not None else None,
         "span_days": round(span_days, 1),
+        "ci_low": ev["ci_low"],
+        "ci_high": ev["ci_high"],
+        "significant": ev["significant"],
+        "verdict": ev["verdict"],
     }

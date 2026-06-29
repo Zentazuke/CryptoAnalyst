@@ -12,6 +12,7 @@ from typing import Any
 
 import numpy as np
 
+from analyst import stats
 from analyst.features import indicators as ind
 from analyst.regime import classify_series
 from analyst.regime import classifier as C
@@ -89,9 +90,12 @@ def calibrate_alerts(
             return None
         hit_rate = hits / fired
         base_rate = base_match / base_total
+        ev = stats.evidence(int(hits), int(fired), base_rate)
         return {"count": fired, "hit_rate": round(hit_rate, 4),
                 "base_rate": round(base_rate, 4),
-                "lift": round(hit_rate / base_rate, 3) if base_rate > 0 else None}
+                "lift": round(hit_rate / base_rate, 3) if base_rate > 0 else None,
+                "ci_low": ev["ci_low"], "ci_high": ev["ci_high"],
+                "significant": ev["significant"], "verdict": ev["verdict"]}
 
     return {"horizon": horizon, "per_type": {key: evaluate(fires[key], DIRECTION[key]) for key in DIRECTION}}
 

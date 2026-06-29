@@ -15,6 +15,7 @@ from typing import Any
 
 import numpy as np
 
+from analyst import stats
 from analyst.features import indicators as ind
 from analyst.regime import classify_series
 from analyst.regime import classifier as C
@@ -88,8 +89,11 @@ def calibrate_combined(
         hit_rate = hits / cn
         base_rate = (long_c * base_up / base_total + short_c * base_down / base_total) / cn
         lift = hit_rate / base_rate if base_rate > 0 else None
+        ev = stats.evidence(int(hits), cn, base_rate)
         return {"count": cn, "hit_rate": round(hit_rate, 4),
-                "base_rate": round(base_rate, 4), "lift": round(lift, 3) if lift else None}
+                "base_rate": round(base_rate, 4), "lift": round(lift, 3) if lift else None,
+                "ci_low": ev["ci_low"], "ci_high": ev["ci_high"],
+                "significant": ev["significant"], "verdict": ev["verdict"]}
 
     comps = [reg_bias, crowd_bias] + ([htf_bias] if htf_candles is not None else [])
     agree2 = np.where((reg_bias != 0) & (reg_bias == crowd_bias), reg_bias, 0)
