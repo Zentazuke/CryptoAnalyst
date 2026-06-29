@@ -46,8 +46,13 @@ echo [data] Capturing a microstructure snapshot ^(best-effort^)...
 echo.
 
 REM --- start the API in its own window --------------------------------------
-echo [api] Starting analyst API on port %API_PORT% ...
-start "Analyst API" /D "%~dp0" cmd /k %PY% -m uvicorn analyst.api.app:app --port %API_PORT%
+REM ANALYST_SCHEDULER=1 makes the API self-feeding (in-process collector keeps
+REM candles/microstructure/funding fresh and journals alerts over time). The API
+REM then owns the DB exclusively, so don't run the offline scripts against it
+REM while it's up.
+echo [api] Starting analyst API on port %API_PORT% (with background scheduler) ...
+set "ANALYST_SCHEDULER=1"
+start "Analyst API" /D "%~dp0" cmd /k set ANALYST_SCHEDULER=1 ^& %PY% -m uvicorn analyst.api.app:app --port %API_PORT%
 
 REM --- start the visualizer in its own window -------------------------------
 echo [web] Starting visualizer on port %WEB_PORT% ...

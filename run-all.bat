@@ -56,8 +56,8 @@ echo [data] Refreshing BTC/ETH candles + microstructure ^(best-effort^)...
 echo.
 
 REM ---- analyst API + dashboard ---------------------------------------------
-echo [analyst] Starting analyst API + visualizer...
-start "Analyst API" /D "%ANALYST%" cmd /k %APY% -m uvicorn analyst.api.app:app --host 127.0.0.1 --port %API_PORT%
+echo [analyst] Starting analyst API + visualizer (with background scheduler)...
+start "Analyst API" /D "%ANALYST%" cmd /k set ANALYST_SCHEDULER=1 ^& %APY% -m uvicorn analyst.api.app:app --host 127.0.0.1 --port %API_PORT%
 start "Analyst Frontend" /D "%ANALYST%frontend" cmd /k npm run dev
 
 REM ---- wait for the analyst API to be ready, then open the dashboard -------

@@ -90,8 +90,18 @@ CREATE TABLE IF NOT EXISTS funding_history (
 class Store:
     """Thin DuckDB wrapper. Use one instance per process for writes."""
 
-    def __init__(self, db_path: str | Path, read_only: bool = False) -> None:
+    def __init__(self, db_path: str | Path | None = None, read_only: bool = False,
+                 conn=None) -> None:
+        # Share an existing (read-write) connection — e.g. a sibling cursor off
+        # the API's connection — so an in-process writer rides one DB instance
+        # instead of opening a second handle (which DuckDB's lock forbids).
+        if conn is not None:
+            self.db_path = ":shared:"
+            self.conn = conn
+            self._owns_conn = False
+            return
         self.db_path = str(db_path)
+        self._owns_conn = True
         if not read_only:
             Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
         self.conn = duckdb.connect(self.db_path, read_only=read_only)
@@ -99,7 +109,8 @@ class Store:
             self.conn.execute(_SCHEMA)
 
     def close(self) -> None:
-        self.conn.close()
+        if getattr(self, "_owns_conn", True):
+            self.conn.close()
 
     def __enter__(self) -> "Store":
         return self

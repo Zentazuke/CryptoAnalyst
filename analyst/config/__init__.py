@@ -10,5 +10,9 @@ from analyst.config.settings import (  # noqa: F401
     INTERVAL_SECONDS,
     PERP_FOR,
     RAW_DIR,
+    SCHEDULER_ENABLED,
+    SCHEDULER_INTERVALS,
+    SCHEDULER_SYMBOLS,
+    SCHEDULER_TIMEFRAMES,
     SENTIMENT_API_BASE,
 )

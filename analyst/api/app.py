@@ -21,7 +21,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from analyst.commentary import DEFAULT_HORIZON, generate_commentary
 from analyst.metric_reads import metric_reads
 from analyst.ensemble import ensemble_read
-from analyst.config import DB_PATH, DEFAULT_TIMEFRAME, INTERVAL_SECONDS
+from analyst.config import DB_PATH, DEFAULT_TIMEFRAME, INTERVAL_SECONDS, SCHEDULER_ENABLED
 from analyst.outlook_calibration import calibrate_combined
 from analyst.ingestion import make_source
 from analyst.ingestion.sentiment import SentimentClient
@@ -55,15 +55,25 @@ from analyst.storage import Store
 from analyst.utils import ms_to_iso, now_ms
 
 _store: Store | None = None
+_scheduler = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global _store
-    _store = Store(DB_PATH, read_only=True)
+    global _store, _scheduler
+    # Read-write only when the in-process scheduler is on; otherwise read-only
+    # (the default — keeps tests and ad-hoc runs side-effect free).
+    _store = Store(DB_PATH, read_only=not SCHEDULER_ENABLED)
+    if SCHEDULER_ENABLED:
+        from analyst.scheduler import Scheduler
+        _scheduler = Scheduler(_store.conn)
+        _scheduler.start()
     try:
         yield
     finally:
+        if _scheduler is not None:
+            _scheduler.stop()
+            _scheduler = None
         _store.close()
         _store = None
 
@@ -83,6 +93,14 @@ def store() -> Store:
     if _store is None:  # pragma: no cover - guarded by lifespan
         raise HTTPException(status_code=503, detail="store not initialised")
     return _store
+
+
+@app.get("/scheduler")
+def scheduler_status() -> dict:
+    """Background-collector status (task cadences, run counts, errors)."""
+    if _scheduler is None:
+        return {"enabled": False, "detail": "scheduler off (set ANALYST_SCHEDULER=1 to enable)"}
+    return {"enabled": True, **_scheduler.status()}
 
 
 _live_cache: dict[tuple, tuple[float, list[dict]]] = {}
