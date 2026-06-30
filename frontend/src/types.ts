@@ -308,6 +308,21 @@ export interface OnChain {
   divergence_calibration?: Evidence | null;
 }
 
+export interface VrpRead {
+  symbol: string;
+  as_of: string;
+  currency: string;
+  implied_vol_dvol: number;
+  realized_vol_30d: number;
+  premium_volpts: number;
+  premium_percentile: number;
+  premium_median: number;
+  verdict: "rich" | "fair" | "cheap";
+  recommendation: string;
+  samples: number;
+  trade: { hold_days: number; structure: string; loss_cap_volpts: number; note: string };
+}
+
 export interface MicroSnapshot {
   symbol: string;
   ts: number;

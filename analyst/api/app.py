@@ -21,6 +21,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from analyst.commentary import DEFAULT_HORIZON, generate_commentary
 from analyst.metric_reads import metric_reads
 from analyst.ensemble import ensemble_read
+from analyst.vrp_live import vrp_read
 from analyst.config import (
     DB_PATH, DEFAULT_TIMEFRAME, INTERVAL_SECONDS, SCHEDULER_ENABLED,
     SCHEDULER_SYMBOLS, SCHEDULER_TIMEFRAMES,
@@ -628,6 +629,23 @@ def commentary(
     ens = _cached(("ensemble", symbol, timeframe), 1800, lambda: ensemble_read(rows, timeframe))
     return {"symbol": symbol, "timeframe": timeframe, "as_of": ms_to_iso(rows[-1]["ts"]),
             "metric_reads": reads, "ensemble": ens, **note}
+
+
+@app.get("/vrp/{symbol}")
+def vrp(
+    symbol: str,
+) -> dict:
+    """Live variance-risk-premium read (BTC/ETH): implied (DVOL) vs realized,
+    the premium and its percentile, a rich/fair/cheap verdict, and the defined-
+    risk trade spec. The cockpit for the project's one validated edge."""
+    cur = symbol.split("_")[0].upper()
+    rows = _load_candles(symbol, "1D")
+    if not rows:
+        raise HTTPException(status_code=404, detail=f"no daily data for {symbol}")
+    read = _cached(("vrp", cur), 1800, lambda: vrp_read(cur, rows))
+    if read is None:
+        raise HTTPException(status_code=404, detail=f"no DVOL coverage for {cur} (BTC/ETH only)")
+    return {"symbol": symbol, "as_of": ms_to_iso(rows[-1]["ts"]), **read}
 
 
 @app.get("/ensemble/{symbol}")

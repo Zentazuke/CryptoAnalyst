@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { fetchChart, fetchMicro, fetchCommentary, fetchSentiment, fetchScan, fetchOnchain, fetchAlerts, fetchAlertJournal, fetchDataHealth, API_BASE } from "./api";
-import type { AlertJournalResponse, AlertsResponse, ChartResponse, Commentary, DataHealth, MicroSnapshot, OnChain, ScanResponse, Sentiment } from "./types";
+import { fetchChart, fetchMicro, fetchCommentary, fetchSentiment, fetchScan, fetchOnchain, fetchAlerts, fetchAlertJournal, fetchDataHealth, fetchVrp, API_BASE } from "./api";
+import type { AlertJournalResponse, AlertsResponse, ChartResponse, Commentary, DataHealth, MicroSnapshot, OnChain, ScanResponse, Sentiment, VrpRead } from "./types";
 import { DataHealthBar } from "./components/DataHealthBar";
+import { VrpCard } from "./components/VrpCard";
 import { Controls } from "./components/Controls";
 import { TrustBar } from "./components/TrustBar";
 import { Section } from "./components/Section";
@@ -54,6 +55,7 @@ export default function App() {
   const [alerts, setAlerts] = useState<AlertsResponse | null>(null);
   const [journal, setJournal] = useState<AlertJournalResponse | null>(null);
   const [health, setHealth] = useState<DataHealth | null>(null);
+  const [vrp, setVrp] = useState<VrpRead | null>(null);
   const [scanLoading, setScanLoading] = useState(false);
 
   const loadScan = useCallback(() => {
@@ -110,6 +112,12 @@ export default function App() {
   // On-chain is slow-moving daily data — load once per symbol, never polled.
   useEffect(() => {
     fetchOnchain(symbol).then(setOnchain).catch(() => setOnchain(null));
+  }, [symbol]);
+
+  // VRP read (BTC/ETH only) — slow-moving, load per symbol; null hides the card.
+  useEffect(() => {
+    setVrp(null);
+    fetchVrp(symbol).then(setVrp).catch(() => setVrp(null));
   }, [symbol]);
 
   // Data-health: poll independently so liveness is always current (every 20s).
@@ -177,6 +185,11 @@ export default function App() {
 
       {/* ── The synthesized read, up top: everything condensed and analysed ── */}
       {data && <TrustBar data={data} timeframe={timeframe} />}
+
+      {/* The one validated edge: the volatility-risk-premium cockpit (BTC/ETH). */}
+      <ErrorBoundary name="VRP">
+        <VrpCard vrp={vrp} />
+      </ErrorBoundary>
 
       <ErrorBoundary name="Analyst note">
         <CommentaryCard
