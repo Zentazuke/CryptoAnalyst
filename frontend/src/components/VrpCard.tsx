@@ -1,4 +1,4 @@
-import type { VrpRead } from "../types";
+import type { VrpRead, VrpJournalResponse } from "../types";
 
 const VERDICT: Record<string, { color: string; label: string }> = {
   rich: { color: "#3fb950", label: "RICH — well-paid to sell" },
@@ -9,8 +9,10 @@ const VERDICT: Record<string, { color: string; label: string }> = {
 /** Live variance-risk-premium read — the cockpit for the one validated edge.
  *  Frames (not predicts) the current implied-vs-realized spread and whether
  *  it's rich enough to sell vol, defined-risk. BTC/ETH only. */
-export function VrpCard({ vrp }: { vrp: VrpRead | null }) {
+export function VrpCard({ vrp, journal }: { vrp: VrpRead | null; journal?: VrpJournalResponse | null }) {
   if (!vrp) return null;
+  const jv = journal?.by_verdict ?? {};
+  const matured = Object.values(jv).reduce((s, x) => s + x.n, 0);
   const v = VERDICT[vrp.verdict] ?? VERDICT.fair;
   const pctl = Math.max(0, Math.min(1, vrp.premium_percentile));
 
@@ -45,6 +47,25 @@ export function VrpCard({ vrp }: { vrp: VrpRead | null }) {
         Validated trade: sell {vrp.trade.hold_days}d vol, {vrp.trade.structure}, loss capped ~{vrp.trade.loss_cap_volpts} vol-pts
         ({vrp.trade.note}). See VRP_MODEL_CARD.md — BTC is the robust case; ETH failed sub-period stability.
       </p>
+
+      {journal && (
+        <div className="vrp-journal">
+          <span className="vrp-k">Live signal journal</span>
+          {journal.count === 0 ? (
+            <span className="muted-txt"> — accruing; it logs the read daily and outcomes mature in 30d.</span>
+          ) : matured === 0 ? (
+            <span className="muted-txt"> — {journal.count} logged; first outcomes mature in 30d.</span>
+          ) : (
+            <span className="muted-txt">
+              {" "}({matured} matured):{" "}
+              {["rich", "fair", "cheap"].filter((v) => jv[v]).map((v) => (
+                <span key={v}> {v} {jv[v].mean_pnl_volpts >= 0 ? "+" : ""}{jv[v].mean_pnl_volpts} vol-pts ({(jv[v].hit_rate * 100).toFixed(0)}% pos, n={jv[v].n}) ·</span>
+              ))}{" "}
+              <i>"rich" should beat "cheap" if the signal is real.</i>
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 }

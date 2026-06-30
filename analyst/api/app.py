@@ -38,9 +38,11 @@ from analyst.onchain import onchain_snapshot
 from analyst.onchain_calibration import calibrate_onchain_divergence
 from analyst.scanner import scan_symbols
 from analyst.storage.journal import AlertJournal
+from analyst.storage.vrp_journal import VrpJournal
 from analyst.vol import implied_vol_context
 
 _journal: AlertJournal | None = None
+_vrp_journal: VrpJournal | None = None
 
 
 def journal() -> AlertJournal | None:
@@ -51,6 +53,16 @@ def journal() -> AlertJournal | None:
         except Exception:
             return None
     return _journal
+
+
+def vrp_journal() -> VrpJournal | None:
+    global _vrp_journal
+    if _vrp_journal is None:
+        try:
+            _vrp_journal = VrpJournal()
+        except Exception:
+            return None
+    return _vrp_journal
 
 HIGHER_TF ={"1m": "15m", "5m": "1h", "15m": "1h", "30m": "4h", "1h": "4h", "4h": "1D", "12h": "1D", "1D": "7D"}
 from analyst.features import compute_indicators, snapshot
@@ -646,6 +658,45 @@ def vrp(
     if read is None:
         raise HTTPException(status_code=404, detail=f"no DVOL coverage for {cur} (BTC/ETH only)")
     return {"symbol": symbol, "as_of": ms_to_iso(rows[-1]["ts"]), **read}
+
+
+def _vrp_outcome(rows: list[dict], entry_ts: int, implied: float, horizon: int = 30):
+    """Forward realized vol after a journaled entry + the short-vol P&L it implied.
+    Returns (pnl_volpts, realized_forward, matured)."""
+    import numpy as _np
+    idx = next((i for i, r in enumerate(rows) if r["ts"] >= entry_ts), None)
+    if idx is None or idx + horizon >= len(rows):
+        return None, None, False
+    closes = _np.array([r["close"] for r in rows[idx: idx + horizon + 1]], float)
+    rets = _np.diff(_np.log(closes))
+    realized = float(_np.std(rets, ddof=0) * math.sqrt(365) * 100.0)
+    return round(implied - realized, 1), round(realized, 1), True
+
+
+@app.get("/vrp-journal")
+def vrp_journal_feed(limit: int = Query(default=200, ge=1, le=500)) -> dict:
+    """The live VRP signal journal with forward outcomes once 30 days elapse —
+    does 'rich' actually precede profitable short-vol windows, measured live?"""
+    j = vrp_journal()
+    if not j:
+        return {"count": 0, "by_verdict": {}, "entries": []}
+    rows = j.recent(limit)
+    candle_cache: dict[str, list[dict]] = {}
+    out = []
+    for r in rows:
+        cur = r["currency"]
+        if cur not in candle_cache:
+            candle_cache[cur] = _load_candles(f"{cur}_USDT", "1D")
+        pnl, realized_fwd, matured = _vrp_outcome(candle_cache[cur], r["ts"], r["implied_vol"])
+        out.append({**r, "as_of": ms_to_iso(r["ts"]), "realized_forward": realized_fwd,
+                    "pnl_volpts": pnl, "matured": matured})
+    by_verdict: dict[str, dict] = {}
+    for v in ("rich", "fair", "cheap"):
+        ms = [o["pnl_volpts"] for o in out if o["matured"] and o["verdict"] == v and o["pnl_volpts"] is not None]
+        if ms:
+            by_verdict[v] = {"n": len(ms), "mean_pnl_volpts": round(sum(ms) / len(ms), 1),
+                             "hit_rate": round(sum(1 for p in ms if p > 0) / len(ms), 2)}
+    return {"count": len(out), "by_verdict": by_verdict, "entries": out}
 
 
 @app.get("/ensemble/{symbol}")

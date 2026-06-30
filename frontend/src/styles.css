@@ -275,6 +275,7 @@ header.app-head {
 .vrp-meter-labels { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--muted); margin: 4px 2px 0; }
 .vrp-rec { font-size: 13.5px; line-height: 1.5; margin: 12px 0 6px; }
 .vrp-trade { font-size: 11.5px; line-height: 1.45; margin: 0; }
+.vrp-journal { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); font-size: 11.5px; line-height: 1.5; }
 
 /* Directional ensemble */
 .ensemble { margin-bottom: 16px; }

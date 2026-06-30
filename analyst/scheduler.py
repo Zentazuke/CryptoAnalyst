@@ -57,6 +57,7 @@ class Scheduler:
         iv = {**SCHEDULER_INTERVALS, **(intervals or {})}
         self._source = None
         self._journal: AlertJournal | None = None
+        self._vrp_journal = None
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self.tasks = [
@@ -64,6 +65,7 @@ class Scheduler:
             Task("microstructure", iv["microstructure"], self._microstructure),
             Task("funding", iv["funding"], self._funding),
             Task("alert_journal", iv["alert_journal"], self._alert_journal),
+            Task("vrp_journal", iv.get("vrp_journal", 21600), self._vrp_journal_task),
         ]
 
     # ---- lifecycle --------------------------------------------------------
@@ -157,3 +159,22 @@ class Scheduler:
         alerts = detect_alerts(rows)
         if alerts:
             self._journal.record(alerts, tf)
+
+    def _vrp_journal_task(self) -> None:
+        """Record the daily VRP read for BTC/ETH so it forward-validates live."""
+        from analyst.ingestion.deribit import DeribitSource
+        from analyst.storage.vrp_journal import VrpJournal
+        from analyst.vrp_live import vrp_read
+        if self._vrp_journal is None:
+            self._vrp_journal = VrpJournal()
+        src = DeribitSource()
+        try:
+            for sym in ("BTC_USDT", "ETH_USDT"):
+                rows = self.store.get_candles(sym, "1D")
+                if not rows:
+                    continue
+                read = vrp_read(sym.split("_")[0], rows, source=src)
+                if read:
+                    self._vrp_journal.record(read)
+        finally:
+            src.close()

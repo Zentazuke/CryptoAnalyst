@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { fetchChart, fetchMicro, fetchCommentary, fetchSentiment, fetchScan, fetchOnchain, fetchAlerts, fetchAlertJournal, fetchDataHealth, fetchVrp, API_BASE } from "./api";
-import type { AlertJournalResponse, AlertsResponse, ChartResponse, Commentary, DataHealth, MicroSnapshot, OnChain, ScanResponse, Sentiment, VrpRead } from "./types";
+import { fetchChart, fetchMicro, fetchCommentary, fetchSentiment, fetchScan, fetchOnchain, fetchAlerts, fetchAlertJournal, fetchDataHealth, fetchVrp, fetchVrpJournal, API_BASE } from "./api";
+import type { AlertJournalResponse, AlertsResponse, ChartResponse, Commentary, DataHealth, MicroSnapshot, OnChain, ScanResponse, Sentiment, VrpRead, VrpJournalResponse } from "./types";
 import { DataHealthBar } from "./components/DataHealthBar";
 import { VrpCard } from "./components/VrpCard";
 import { Controls } from "./components/Controls";
@@ -56,6 +56,7 @@ export default function App() {
   const [journal, setJournal] = useState<AlertJournalResponse | null>(null);
   const [health, setHealth] = useState<DataHealth | null>(null);
   const [vrp, setVrp] = useState<VrpRead | null>(null);
+  const [vrpJournal, setVrpJournal] = useState<VrpJournalResponse | null>(null);
   const [scanLoading, setScanLoading] = useState(false);
 
   const loadScan = useCallback(() => {
@@ -118,6 +119,7 @@ export default function App() {
   useEffect(() => {
     setVrp(null);
     fetchVrp(symbol).then(setVrp).catch(() => setVrp(null));
+    fetchVrpJournal().then(setVrpJournal).catch(() => setVrpJournal(null));
   }, [symbol]);
 
   // Data-health: poll independently so liveness is always current (every 20s).
@@ -188,7 +190,7 @@ export default function App() {
 
       {/* The one validated edge: the volatility-risk-premium cockpit (BTC/ETH). */}
       <ErrorBoundary name="VRP">
-        <VrpCard vrp={vrp} />
+        <VrpCard vrp={vrp} journal={vrpJournal} />
       </ErrorBoundary>
 
       <ErrorBoundary name="Analyst note">

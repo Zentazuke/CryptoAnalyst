@@ -323,6 +323,12 @@ export interface VrpRead {
   trade: { hold_days: number; structure: string; loss_cap_volpts: number; note: string };
 }
 
+export interface VrpJournalResponse {
+  count: number;
+  by_verdict: Record<string, { n: number; mean_pnl_volpts: number; hit_rate: number }>;
+  entries: { as_of: string; currency: string; verdict: string; premium: number; matured: boolean; pnl_volpts: number | null }[];
+}
+
 export interface MicroSnapshot {
   symbol: string;
   ts: number;
