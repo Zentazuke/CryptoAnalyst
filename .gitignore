@@ -16,3 +16,8 @@ data/raw/*.json
 
 # Env / secrets
 .env
+
+# generated analyst exports + docs (not source)
+analyst_lean*.csv
+Crypto-Analyst-Overview.pdf
+*.pdf
