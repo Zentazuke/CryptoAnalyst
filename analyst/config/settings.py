@@ -65,7 +65,7 @@ DEFAULT_TIMEFRAME: str = "1h"
 # turn the API into an always-on, self-feeding service.
 SCHEDULER_ENABLED: bool = os.environ.get("ANALYST_SCHEDULER", "0").lower() in ("1", "true", "yes")
 SCHEDULER_SYMBOLS: list[str] = [
-    s.strip() for s in os.environ.get("ANALYST_SCHEDULER_SYMBOLS", "BTC_USDT,ETH_USDT").split(",") if s.strip()
+    s.strip() for s in os.environ.get("ANALYST_SCHEDULER_SYMBOLS", "BTC_USDT,ETH_USDT,ROBO_USDC").split(",") if s.strip()
 ]
 SCHEDULER_TIMEFRAMES: list[str] = [
     t.strip() for t in os.environ.get("ANALYST_SCHEDULER_TIMEFRAMES", "1h,4h,1D").split(",") if t.strip()

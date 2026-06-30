@@ -18,7 +18,7 @@ import { AlertJournalCard } from "./components/AlertJournalCard";
 import { OnChainCard } from "./components/OnChainCard";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
-const SYMBOLS = ["BTC_USDT", "ETH_USDT"];
+const SYMBOLS = ["BTC_USDT", "ETH_USDT", "ROBO_USDC"];
 const TIMEFRAMES = ["1h", "4h", "1D"];
 
 /** Exchange instrument ("BTCUSDT") -> internal symbol ("BTC_USDT"). */

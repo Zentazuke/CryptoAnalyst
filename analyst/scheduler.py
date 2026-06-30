@@ -116,23 +116,35 @@ class Scheduler:
             self._stop.wait(TICK_SECONDS)
 
     # ---- tasks ------------------------------------------------------------
+    # Each task isolates per-symbol failures: a coin with no perp (no funding)
+    # or a transient fetch error must not abort collection for the others.
     def _candles(self) -> None:
         for sym in self.symbols:
             for tf in self.timeframes:
-                ingest_symbol(sym, tf, 300, self.store, self._source)
+                try:
+                    ingest_symbol(sym, tf, 300, self.store, self._source)
+                except Exception as e:
+                    log.warning("candles %s %s failed: %s", sym, tf, e)
 
     def _microstructure(self) -> None:
         for sym in self.symbols:
-            collect_microstructure(sym, self._source, self.store, band_bps=DEPTH_BAND_BPS)
+            try:
+                collect_microstructure(sym, self._source, self.store, band_bps=DEPTH_BAND_BPS)
+            except Exception as e:
+                log.warning("microstructure %s failed: %s", sym, e)
 
     def _funding(self) -> None:
         for sym in self.symbols:
             perp = self._source.perp_for(sym) if hasattr(self._source, "perp_for") else None
             if not perp or not hasattr(self._source, "fetch_funding_history"):
                 continue
-            rows, _ = self._source.fetch_funding_history(perp, total=1000)
-            if rows:
-                self.store.upsert_funding(sym, rows, self._source.name)
+            try:
+                rows, _ = self._source.fetch_funding_history(perp, total=1000)
+                if rows:
+                    self.store.upsert_funding(sym, rows, self._source.name)
+            except Exception as e:
+                # common for spot-only coins (no perp) — log quietly and move on
+                log.info("funding %s unavailable: %s", sym, e)
 
     def _alert_journal(self) -> None:
         if self._journal is None:
