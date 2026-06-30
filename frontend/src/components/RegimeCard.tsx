@@ -30,13 +30,17 @@ export function RegimeCard({ regime, timeframe }: { regime: RegimeCurrent; timef
         <span className="regime-name" style={{ color }}>{regimeLabel(regime.label)}</span>
       </div>
 
-      <div className="conf-row">
-        <span className="conf-label">confidence</span>
+      <div className="conf-row" title="How cleanly the tape fits this regime label — NOT a probability that price moves in this direction. For directional reliability, see the measured calibration below.">
+        <span className="conf-label">regime fit</span>
         <div className="conf-track">
           <div className="conf-fill" style={{ width: `${conf}%`, background: color }} />
         </div>
         <span className="conf-val">{conf}%</span>
       </div>
+      <p className="muted-txt" style={{ fontSize: 10.5, margin: "-6px 0 10px" }}>
+        Fit confidence in the label — not a directional probability (it doesn't track which way price goes).
+        Trust the measured reliability below.
+      </p>
 
       <ul className="reasons">
         {regime.reasons.map((r, i) => (
