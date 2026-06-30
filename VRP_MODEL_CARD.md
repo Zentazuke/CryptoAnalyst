@@ -1,49 +1,49 @@
 # VRP Strategy — Model Card
 
-_The one validated, non-directional edge this project found: harvesting the
-volatility risk premium (selling implied vol that trades above realized),
-defined-risk. Every figure is causal, costs-included, and stress-tested._
+_The variance risk premium is the only edge this project couldn't disprove. It is
+**real but not cleanly harvestable by a retail, defined-risk trader.** This card
+states that honestly — corrected after a real structure-level backtest replaced
+the optimistic proxy._
 
-## The strategy
-- **Sell vol** (short a vol/variance position) when implied (Deribit **DVOL**) is
-  above expected realized — which it is, structurally, ~70% of the time.
-- **Monthly, 30-day hold** — this *must* match DVOL's 30-day tenor; shorter holds
-  mismatch the implied horizon and produce fake edge.
-- **Defined-risk** — cap each trade's loss (~−12 vol-pts) by selling a spread /
-  buying a far tail hedge (~1.5 vol-pts cost). The premium is the edge; the
-  *structure*, not timing, manages the tail (an entry-time risk gate does **not**
-  help — crashes arrive from calm).
+## The premium is real (this part holds)
+On BTC, implied vol (Deribit **DVOL**) sits systematically above the realized vol
+that follows:
+- implied > realized **~74% of days**, by **~+9.7 vol-points** on average,
+- stable across both halves of ~5 years, not a reshuffling fluke,
+- structural, not predictive — you're paid to bear tail risk, like an insurer.
 
-## Measured performance (~5y, 63 non-overlapping monthly trades, net of 2 vol-pt cost)
+## But the tradeable version loses (this corrects the earlier claim)
+An earlier version of this card reported a defined-risk Sharpe of **~1.8**. That
+was a **frictionless proxy** (a continuously delta-hedged variance swap) — and it
+was **wrong as a retail trade**. The real structure-level backtest (a monthly,
+DVOL-priced **iron condor** with the actual capped payoff, fees included) comes
+out **net-negative across strikes and tenors: Sharpe −0.04 to −0.8**, an 82–91%
+win rate masking a few **−100% capped tails** that wipe out the small wins.
 
-| Asset | Sharpe (95% CI) | First half | Second half | Cost 1→4 | Beats placebo | Verdict |
-|---|---|---|---|---|---|---|
-| **BTC** | **+1.79** [+0.87, +2.71] | +2.19 | +1.12 | 1.98 → 1.39 | 85% | **robust — tradeable** |
-| ETH | +1.20 [+0.31, +2.09] | +2.09 | +0.34 | 1.36 → 0.88 | 34% | **fails — drop** |
+The tell: **even priced at realized vol (zero premium), the static condor loses
+~−5%/cycle** — because crypto's endpoints are fatter-tailed than daily vol
+predicts, so a static short structure held to expiry gets run over by jumps. The
+~+2.5%/cycle premium can't cover the fat-tail drag.
 
-- **BTC** is positive in *both* sub-periods and survives cost stress → a real,
-  stable, structural edge.
-- **ETH** concentrated in 2021–23 and faded to ~0 in 2024–26, and is
-  indistinguishable from a DVOL-shuffle placebo → not a reliable standalone
-  strategy. The earlier ETH "rescue" was the tail-cap mechanically helping any
-  short-vol, not an ETH premium.
+## The reconciliation
+| | what it is | result |
+|---|---|---|
+| Proxy (~1.8 Sharpe) | continuously **delta-hedged variance swap** | harvests implied−realized regardless of the endpoint |
+| Tradeable condor (−0.04 to −0.8) | **static endpoint bet**, held to expiry | the fat tail kills it |
+
+The only thing that monetizes the premium cleanly is a **delta-hedged short
+straddle (rehedged daily)** — the operationally-intensive, gap-risky
+institutional version. A small trader selling vol they can't continuously hedge
+is exactly how blow-ups happen.
+
+## Verdict
+**Context, not a trade signal.** The VRP read in the analyst (DVOL vs realized,
+the premium percentile, rich/fair/cheap) is a *true market observable* worth
+watching — but "rich" is **not** a green light to sell vol. Retail defined-risk
+structures don't harvest it; delta-hedged variance does, and that's out of scope
+for this tool. Treat the cockpit as a gauge, never as a trade.
 
 ## What does NOT work (tested, negative)
-- **Forecasting realized vol** to time it — HAR doesn't robustly beat persistence
-  (the winner flips between coins); and you don't need it, the premium is a
-  *level* edge.
-- **An analyst risk-state gate** on entries — lowers the Sharpe; crashes enter
-  from calm, and "risk-off when vol is high" skips the richest post-scare trades.
-
-## Honest caveats
-- **Vol-swap proxy, not a real option chain.** Skew makes the tail hedge dearer
-  and the left tail fatter than modeled → real net edge is thinner than shown.
-- **Small sample** — 63 monthly trades; even BTC's CI spans ~[0.9, 2.7].
-- **Tenor discipline** — only the 30-day horizon is valid against DVOL.
-- **Execution** — requires Deribit options; live frictions (spreads, slippage,
-  margin) exceed the 2 vol-pt assumption.
-
-## The analyst's role
-Not to predict the premium (it can't beat costs) but to **frame and monitor** it:
-current DVOL vs forecast realized, the premium percentile (rich / fair / cheap),
-and the defined-risk levels. The cockpit for the one strategy that works.
+- Forecasting realized vol to time it (HAR doesn't robustly beat persistence).
+- An analyst risk-state gate on entries (crashes enter from calm).
+- The retail defined-risk harvest itself (above).

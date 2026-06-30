@@ -22,6 +22,7 @@ from analyst.commentary import DEFAULT_HORIZON, generate_commentary
 from analyst.metric_reads import metric_reads
 from analyst.ensemble import ensemble_read
 from analyst.vrp_live import vrp_read
+from analyst.carry import carry_read
 from analyst.config import (
     DB_PATH, DEFAULT_TIMEFRAME, INTERVAL_SECONDS, SCHEDULER_ENABLED,
     SCHEDULER_SYMBOLS, SCHEDULER_TIMEFRAMES,
@@ -641,6 +642,21 @@ def commentary(
     ens = _cached(("ensemble", symbol, timeframe), 1800, lambda: ensemble_read(rows, timeframe))
     return {"symbol": symbol, "timeframe": timeframe, "as_of": ms_to_iso(rows[-1]["ts"]),
             "metric_reads": reads, "ensemble": ens, **note}
+
+
+@app.get("/carry/{symbol}")
+def carry(
+    symbol: str,
+) -> dict:
+    """Annualized delta-neutral funding carry + percentile + compression — a real
+    observable, framed honestly (context, not alpha)."""
+    rows = _load_funding(symbol)
+    if not rows:
+        raise HTTPException(status_code=404, detail=f"no funding history for {symbol}")
+    read = _cached(("carry", symbol), 1800, lambda: carry_read(rows))
+    if read is None:
+        raise HTTPException(status_code=404, detail=f"insufficient funding history for {symbol}")
+    return {"symbol": symbol, "as_of": ms_to_iso(rows[-1].get("t", rows[-1].get("ts", 0))), **read}
 
 
 @app.get("/vrp/{symbol}")

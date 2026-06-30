@@ -19,7 +19,7 @@ export function VrpCard({ vrp, journal }: { vrp: VrpRead | null; journal?: VrpJo
   return (
     <div className="card vrp">
       <div className="card-title">
-        Volatility risk premium · {vrp.currency} <span className="muted-txt">· the strategy cockpit</span>
+        Volatility risk premium · {vrp.currency} <span className="muted-txt">· premium gauge (context, not a trade)</span>
       </div>
 
       <div className="vrp-head">
@@ -44,8 +44,7 @@ export function VrpCard({ vrp, journal }: { vrp: VrpRead | null; journal?: VrpJo
 
       <p className="vrp-rec">{vrp.recommendation}</p>
       <p className="vrp-trade muted-txt">
-        Validated trade: sell {vrp.trade.hold_days}d vol, {vrp.trade.structure}, loss capped ~{vrp.trade.loss_cap_volpts} vol-pts
-        ({vrp.trade.note}). See VRP_MODEL_CARD.md — BTC is the robust case; ETH failed sub-period stability.
+        ⚠ Context, not a trade signal: {vrp.trade.note} See VRP_MODEL_CARD.md.
       </p>
 
       {journal && (

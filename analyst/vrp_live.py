@@ -57,12 +57,15 @@ def vrp_read(currency: str, daily_candles: list[Any], source: object | None = No
     cur = float(premiums[-1])
     pctl = float((premiums < cur).mean())
     verdict = "rich" if pctl >= 0.66 else "cheap" if pctl <= 0.33 else "fair"
+    # Honest framing: the premium is real but a real structure backtest showed the
+    # retail defined-risk harvest is net-negative (fat tails). This is a gauge,
+    # not a trade signal — see VRP_MODEL_CARD.md.
     rec = {
-        "rich": "Premium is well-paid vs its history — favorable to sell vol DEFINED-RISK "
-                "(cap the loss with a spread; never naked).",
-        "fair": "Premium is middling — a marginal sell at best; size down or wait for a richer level.",
-        "cheap": "Vol looks cheap vs realized — stand aside on selling; a squeeze/long-gamma setup is the "
-                 "contrarian read, not a vol sale.",
+        "rich": "Premium is high vs its history. NOTE: this is context, not a trade signal — the retail "
+                "defined-risk harvest (iron condor) tested net-negative; only daily delta-hedged variance "
+                "captures it. A gauge, not a green light to sell.",
+        "fair": "Premium is middling — nothing to act on; the retail harvest doesn't clear costs anyway.",
+        "cheap": "Vol is cheap vs realized — if anything a long-gamma context, but not a tradeable signal here.",
     }[verdict]
 
     return {
@@ -75,7 +78,8 @@ def vrp_read(currency: str, daily_candles: list[Any], source: object | None = No
         "verdict": verdict,
         "recommendation": rec,
         "samples": len(premiums),
-        # the validated trade spec from the model card (BTC is the robust one)
-        "trade": {"hold_days": 30, "structure": "defined-risk (capped)",
-                  "loss_cap_volpts": 12, "note": "30d to match DVOL tenor"},
+        # honest harvest note (NOT a validated retail trade — see VRP_MODEL_CARD.md)
+        "trade": {"harvestable_retail": False,
+                  "note": "premium real, but retail defined-risk loses to fat tails; only daily "
+                          "delta-hedged variance harvests it (institutional). Context, not a trade."},
     }

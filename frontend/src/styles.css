@@ -264,6 +264,7 @@ header.app-head {
 
 /* Volatility risk premium (the strategy cockpit) */
 .vrp { margin-bottom: 16px; border-color: #2a3a44; }
+.carry { margin-bottom: 16px; }
 .vrp-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
 .vrp-verdict { font-size: 13px; font-weight: 700; padding: 3px 12px; border: 1px solid; border-radius: 999px; letter-spacing: 0.3px; }
 .vrp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 12px; }

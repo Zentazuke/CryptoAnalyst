@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { fetchChart, fetchMicro, fetchCommentary, fetchSentiment, fetchScan, fetchOnchain, fetchAlerts, fetchAlertJournal, fetchDataHealth, fetchVrp, fetchVrpJournal, API_BASE } from "./api";
-import type { AlertJournalResponse, AlertsResponse, ChartResponse, Commentary, DataHealth, MicroSnapshot, OnChain, ScanResponse, Sentiment, VrpRead, VrpJournalResponse } from "./types";
+import { fetchChart, fetchMicro, fetchCommentary, fetchSentiment, fetchScan, fetchOnchain, fetchAlerts, fetchAlertJournal, fetchDataHealth, fetchVrp, fetchCarry, fetchVrpJournal, API_BASE } from "./api";
+import type { AlertJournalResponse, AlertsResponse, CarryRead, ChartResponse, Commentary, DataHealth, MicroSnapshot, OnChain, ScanResponse, Sentiment, VrpRead, VrpJournalResponse } from "./types";
 import { DataHealthBar } from "./components/DataHealthBar";
 import { VrpCard } from "./components/VrpCard";
+import { CarryCard } from "./components/CarryCard";
 import { Controls } from "./components/Controls";
 import { TrustBar } from "./components/TrustBar";
 import { Section } from "./components/Section";
@@ -56,6 +57,7 @@ export default function App() {
   const [journal, setJournal] = useState<AlertJournalResponse | null>(null);
   const [health, setHealth] = useState<DataHealth | null>(null);
   const [vrp, setVrp] = useState<VrpRead | null>(null);
+  const [carry, setCarry] = useState<CarryRead | null>(null);
   const [vrpJournal, setVrpJournal] = useState<VrpJournalResponse | null>(null);
   const [scanLoading, setScanLoading] = useState(false);
 
@@ -115,10 +117,12 @@ export default function App() {
     fetchOnchain(symbol).then(setOnchain).catch(() => setOnchain(null));
   }, [symbol]);
 
-  // VRP read (BTC/ETH only) — slow-moving, load per symbol; null hides the card.
+  // VRP read (BTC/ETH only) + funding carry — slow-moving, per symbol; null hides.
   useEffect(() => {
     setVrp(null);
+    setCarry(null);
     fetchVrp(symbol).then(setVrp).catch(() => setVrp(null));
+    fetchCarry(symbol).then(setCarry).catch(() => setCarry(null));
     fetchVrpJournal().then(setVrpJournal).catch(() => setVrpJournal(null));
   }, [symbol]);
 
@@ -191,6 +195,9 @@ export default function App() {
       {/* The one validated edge: the volatility-risk-premium cockpit (BTC/ETH). */}
       <ErrorBoundary name="VRP">
         <VrpCard vrp={vrp} journal={vrpJournal} />
+      </ErrorBoundary>
+      <ErrorBoundary name="Carry">
+        <CarryCard carry={carry} />
       </ErrorBoundary>
 
       <ErrorBoundary name="Analyst note">

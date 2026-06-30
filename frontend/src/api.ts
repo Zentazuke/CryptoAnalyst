@@ -1,4 +1,4 @@
-import type { AlertJournalResponse, AlertsResponse, ChartResponse, Commentary, DataHealth, MicroSnapshot, OnChain, ScanResponse, Sentiment, VrpRead, VrpJournalResponse } from "./types";
+import type { AlertJournalResponse, AlertsResponse, CarryRead, ChartResponse, Commentary, DataHealth, MicroSnapshot, OnChain, ScanResponse, Sentiment, VrpRead, VrpJournalResponse } from "./types";
 
 // Same-origin: the dev server proxies "/api" -> the analyst API (see
 // vite.config.ts). This sidesteps browser CORS and IPv4/IPv6 loopback issues.
@@ -105,6 +105,14 @@ export async function fetchVrp(symbol: string): Promise<VrpRead | null> {
     return await getJSON<VrpRead>(`/vrp/${encodeURIComponent(symbol)}`);
   } catch {
     return null; // 404 = no DVOL coverage (non BTC/ETH)
+  }
+}
+
+export async function fetchCarry(symbol: string): Promise<CarryRead | null> {
+  try {
+    return await getJSON<CarryRead>(`/carry/${encodeURIComponent(symbol)}`);
+  } catch {
+    return null;
   }
 }
 

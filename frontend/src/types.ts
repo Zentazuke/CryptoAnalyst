@@ -320,13 +320,25 @@ export interface VrpRead {
   verdict: "rich" | "fair" | "cheap";
   recommendation: string;
   samples: number;
-  trade: { hold_days: number; structure: string; loss_cap_volpts: number; note: string };
+  trade: { harvestable_retail: boolean; note: string };
 }
 
 export interface VrpJournalResponse {
   count: number;
   by_verdict: Record<string, { n: number; mean_pnl_volpts: number; hit_rate: number }>;
   entries: { as_of: string; currency: string; verdict: string; premium: number; matured: boolean; pnl_volpts: number | null }[];
+}
+
+export interface CarryRead {
+  symbol: string;
+  as_of: string;
+  carry_annual_pct: number;
+  current_funding_8h_pct: number;
+  percentile: number | null;
+  long_avg_annual_pct: number;
+  compressing: boolean;
+  samples: number;
+  note: string;
 }
 
 export interface MicroSnapshot {
