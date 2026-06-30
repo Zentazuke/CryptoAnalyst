@@ -130,12 +130,20 @@ header.app-head {
 
 /* Charts */
 .chart-card {
+  position: relative;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 8px 10px 4px;
   margin-bottom: 14px;
 }
+/* live-price / OHLC legend overlaid on the price pane */
+.price-legend {
+  position: absolute; top: 30px; left: 14px; z-index: 3; pointer-events: none;
+  display: flex; gap: 12px; align-items: baseline; font-variant-numeric: tabular-nums;
+}
+.price-legend .pl-price { font-size: 19px; font-weight: 700; }
+.price-legend .pl-ohlc { font-size: 11px; color: var(--muted); }
 .chart-card .title {
   font-size: 12px;
   color: var(--muted);

@@ -24,13 +24,34 @@ const baseOptions = {
   autoSize: true,
 };
 
+// Price formatter that adapts decimals to magnitude (so a $0.0169 micro-cap and
+// a $60,000 BTC both read cleanly).
+const fmtPrice = (v: number | null | undefined) => {
+  if (v == null || !isFinite(v)) return "—";
+  const a = Math.abs(v);
+  const dp = a >= 1000 ? 2 : a >= 1 ? 2 : a >= 0.01 ? 5 : a >= 0.0001 ? 6 : 8;
+  return v.toLocaleString(undefined, { minimumFractionDigits: dp, maximumFractionDigits: dp });
+};
+
+interface Bar { open: number; high: number; low: number; close: number; }
+const legendHTML = (bar: Bar) => {
+  const col = bar.close >= bar.open ? "#26a69a" : "#ef5350";
+  return (
+    `<span class="pl-price" style="color:${col}">${fmtPrice(bar.close)}</span>` +
+    `<span class="pl-ohlc">O ${fmtPrice(bar.open)} · H ${fmtPrice(bar.high)} · L ${fmtPrice(bar.low)} · C ${fmtPrice(bar.close)}</span>`
+  );
+};
+
 // Hoisted so their identity is stable across re-renders — if these were defined
 // inside Dashboard, each live update would remount the pane <div>s and orphan
 // the charts attached to them (blank panes).
-function Pane({ title, legend, inner }: { title: string; legend?: ReactNode; inner: RefObject<HTMLDivElement> }) {
+function Pane({ title, legend, inner, overlayRef }: {
+  title: string; legend?: ReactNode; inner: RefObject<HTMLDivElement>; overlayRef?: RefObject<HTMLDivElement>;
+}) {
   return (
     <div className="chart-card">
       <div className="title"><span>{title}</span>{legend}</div>
+      {overlayRef && <div className="price-legend" ref={overlayRef} />}
       <div ref={inner} />
     </div>
   );
@@ -76,6 +97,8 @@ export function Dashboard({ data }: { data: ChartResponse }) {
 
   const handles = useRef<ChartHandles | null>(null);
   const lastInstrument = useRef<string>("");
+  const priceLegendRef = useRef<HTMLDivElement>(null);
+  const lastBar = useRef<Bar | null>(null);
 
   // ── build the charts once, on mount ──
   useEffect(() => {
@@ -131,6 +154,21 @@ export function Dashboard({ data }: { data: ChartResponse }) {
       // --- funding: signed histogram with a static zero guide ---
       const fund = funding.addHistogramSeries({ priceLineVisible: false });
       fund.createPriceLine({ price: 0, color: "#8892b0", lineStyle: LineStyle.Dotted, lineWidth: 1, axisLabelVisible: false, title: "" });
+
+      // --- live-price legend + reveal level labels only while hovering ---
+      // The S/R axis labels are hidden by default (clutter); they appear while
+      // the cursor is over the chart. The legend shows the latest price, or the
+      // OHLC of the bar under the cursor.
+      price.subscribeCrosshairMove((param) => {
+        const hh = handles.current;
+        const active = param.point !== undefined && param.time !== undefined;
+        if (hh) hh.levelLines.forEach((l) => l.applyOptions({ axisLabelVisible: active }));
+        const el = priceLegendRef.current;
+        if (!el) return;
+        const hovered = active ? (param.seriesData.get(candles) as Bar | undefined) : undefined;
+        const show = hovered ?? lastBar.current;
+        el.innerHTML = show ? legendHTML(show) : "";
+      });
 
       // --- sync time scales across all panes ---
       let syncing = false;
@@ -199,11 +237,18 @@ export function Dashboard({ data }: { data: ChartResponse }) {
       const drawLevel = (lvl: { price: number; types: string[] }, color: string) => {
         h.levelLines.push(h.candles.createPriceLine({
           price: lvl.price, color, lineStyle: LineStyle.Dashed, lineWidth: 1,
-          axisLabelVisible: true, title: lvl.types[0] ?? "",
+          axisLabelVisible: false, title: lvl.types[0] ?? "",  // hidden until hover
         }));
       };
       (data.levels?.support ?? []).slice(0, 3).forEach((l) => drawLevel(l, "#2e7d46"));
       (data.levels?.resistance ?? []).slice(0, 3).forEach((l) => drawLevel(l, "#b3433b"));
+
+      // live-price legend: default to the latest bar (updates each refresh)
+      const lc = data.candles[data.candles.length - 1];
+      if (lc) {
+        lastBar.current = { open: lc.open, high: lc.high, low: lc.low, close: lc.close };
+        if (priceLegendRef.current) priceLegendRef.current.innerHTML = legendHTML(lastBar.current);
+      }
 
       // only refit the view when the instrument/timeframe actually changes —
       // a live refresh of the same chart keeps your current zoom/pan.
@@ -221,8 +266,9 @@ export function Dashboard({ data }: { data: ChartResponse }) {
     <>
       <Pane
         title={`${data.symbol} · ${data.timeframe} · price`}
-        legend={<>{legendKey("#58a6ff", "SMA 20")}{legendKey("#e3b341", "EMA 20")}{legendKey("#8892b0", "Bollinger 20·2")}</>}
+        legend={<>{legendKey("#58a6ff", "SMA 20")}{legendKey("#e3b341", "EMA 20")}{legendKey("#8892b0", "Bollinger 20·2")}<span className="muted-txt" style={{ fontSize: 10 }}>hover for levels</span></>}
         inner={priceRef}
+        overlayRef={priceLegendRef}
       />
       <Pane title="Regime" legend={<span className="muted-txt">color = market state per bar</span>} inner={regimeRef} />
       <Pane title="RSI 14" inner={rsiRef} />
