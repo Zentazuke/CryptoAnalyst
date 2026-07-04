@@ -64,7 +64,7 @@ Rule: each addition = ingest → persist → calibrate → card → only then UI
 | Phase | Time | Done when | Status |
 |---|---|---|---|
 | P0 | days | keys rotated; release script refuses dirty zips; 4h file can't be misread | ✅ 2026-07-04 (keys: Ricardo) |
-| P1 | 1–2 wk | sentiment/on-chain persisted; SIGNAL_CARD covers them; /explain live | 🟡 P1.1 + P1.4 done 2026-07-04; P1.2/P1.3 next |
+| P1 | 1–2 wk | sentiment/on-chain persisted; SIGNAL_CARD covers them; /explain live | 🟡 P1.1 + P1.2 + P1.4 done 2026-07-04; P1.3 (UI gating) next |
 | P2 T1 | 2–4 wk | skew, liquidations/CVD, stablecoins persisted + carded (pass or graveyard) | — |
 | P3 | parallel | watchlists + explorer shipped; composite only over calibrated signals | — |
 | P4 | ongoing | CI green on Linux; docker-compose up works on a clean machine | 🟡 CI workflow written; first green run pending push |
@@ -73,5 +73,6 @@ Rule: each addition = ingest → persist → calibrate → card → only then UI
 - P0.2 `scripts/make_release.py` · P0.3 4h export fix · P0.4 `.env.example` · P4.1 CI workflow
 - P1.4 `analyst/explain.py` + `GET /explain/{symbol}` (+5 tests) — every fired signal with its receipts
 - P1.1 `analyst/storage/history.py` (MetricHistory, long-format DuckDB) + scheduler `metric_history` task (sentiment 15-min gap, on-chain 6-h gap) + `GET /metric-history/{symbol}` (+5 tests). **History starts accruing as soon as the API runs with `ANALYST_SCHEDULER=1` — start it soon; calibration needs weeks of data.**
+- P1.2 `analyst/metric_calibration.py` + `GET /metric-calibration/{symbol}` (+6 tests): any stored series → SIGNAL_CARD-grade verdict. Fixed a-priori signal convention (value vs trailing-60-obs median), BOTH orientations scored with the both-halves stability rule absorbing the doubled luck surface, staleness guard from the series' own cadence, `best_row()` = reliable-or-nothing. Validated on planted-edge / inverted / noise worlds. **Becomes decisive once P1.1 history matures — it runs today on whatever exists.**
 
 **What we deliberately do NOT do:** add indicators for breadth, buy data before free sources are exhausted, hand-tune composite weights, or ship any signal the calibration harness hasn't scored. The evaluator is right that the next breakthrough is the multi-layer decision engine — but the reason this app is credible is that every layer it has is *proven*. Growth must not break that.

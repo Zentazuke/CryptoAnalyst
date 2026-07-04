@@ -742,6 +742,54 @@ def metric_history(
             "count": len(rows), "series": rows}
 
 
+@app.get("/metric-calibration/{symbol}")
+def metric_calibration(
+    symbol: str,
+    layer: str = Query(default=""),
+    metric: str = Query(default=""),
+    timeframe: str = Query(default=DEFAULT_TIMEFRAME),
+) -> dict:
+    """P1.2: score persisted sentiment/on-chain series the SIGNAL_CARD way.
+    With layer+metric: the full two-orientation report for one series. With just
+    layer: the best defensible row per stored metric (reliable-or-nothing)."""
+    from analyst.metric_calibration import best_row, evaluate_metric
+    from analyst.storage.history import MetricHistory
+    if not layer:
+        raise HTTPException(status_code=422, detail="layer is required")
+    rows_c = _load_candles(symbol, timeframe)
+    if not rows_c:
+        raise HTTPException(status_code=404, detail=f"no {timeframe} data for {symbol}")
+    try:
+        h = MetricHistory()
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=503, detail=f"history store unavailable: {exc}")
+
+    if metric:
+        series = h.series(layer, symbol, metric)
+        if not series:
+            raise HTTPException(status_code=404, detail=f"no {layer}/{metric} history for {symbol}")
+        rep = _cached(("mcal", symbol, layer, metric, timeframe), 1800,
+                      lambda: evaluate_metric(metric, series, rows_c, timeframe))
+        return {"symbol": symbol, "layer": layer, **rep}
+
+    def build() -> dict:
+        cat = [c for c in h.catalog(layer) if c["symbol"] == symbol][:40]
+        out = []
+        for c in cat:
+            series = h.series(layer, symbol, c["metric"])
+            rep = evaluate_metric(c["metric"], series, rows_c, timeframe)
+            best = best_row(rep)
+            out.append({"metric": c["metric"], "n_obs": rep["n_obs"],
+                        "reliable": best is not None, "best": best})
+        out.sort(key=lambda r: (not r["reliable"],
+                                -((r["best"] or {}).get("lift") or 0)))
+        return {"count": len(out), "metrics": out,
+                "note": "reliable=false means NOT proven — treat as decoration."}
+
+    payload = _cached(("mcal_all", symbol, layer, timeframe), 1800, build)
+    return {"symbol": symbol, "layer": layer, "timeframe": timeframe, **payload}
+
+
 @app.get("/explain/{symbol}")
 def explain(
     symbol: str,
