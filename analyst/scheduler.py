@@ -68,6 +68,7 @@ class Scheduler:
             Task("alert_journal", iv["alert_journal"], self._alert_journal),
             Task("vrp_journal", iv.get("vrp_journal", 21600), self._vrp_journal_task),
             Task("metric_history", iv.get("metric_history", 1800), self._metric_history),
+            Task("p2_feeds", iv.get("p2_feeds", 3600), self._p2_feeds),
         ]
 
     # ---- lifecycle --------------------------------------------------------
@@ -188,6 +189,38 @@ class Scheduler:
                                          "coinmetrics", min_gap_s=6 * 3600)
             except Exception as e:
                 log.info("onchain history %s unavailable: %s", sym, e)
+
+    def _p2_feeds(self) -> None:
+        """P2 Tier-1: persist options surface (BTC/ETH), derivatives crowd (all
+        scheduled symbols), and global stablecoin supply into MetricHistory —
+        starting their calibration clocks. All parts fail independently."""
+        from analyst.p2_feeds import derivs_crowd, options_surface, stable_supply
+        from analyst.storage.history import MetricHistory
+        if self._metrics is None:
+            self._metrics = MetricHistory()
+        for cur in ("BTC", "ETH"):
+            try:
+                surf = options_surface(cur)
+                if surf:
+                    self._metrics.record("options", f"{cur}_USDT", surf,
+                                         "deribit", min_gap_s=1800)
+            except Exception as e:  # noqa: BLE001
+                log.info("options surface %s unavailable: %s", cur, e)
+        for sym in self.symbols:
+            try:
+                crowd = derivs_crowd(sym)
+                if crowd:
+                    self._metrics.record("derivatives", sym, crowd,
+                                         "binance-futures", min_gap_s=1800)
+            except Exception as e:  # noqa: BLE001
+                log.info("derivs crowd %s unavailable: %s", sym, e)
+        try:
+            stab = stable_supply()
+            if stab:
+                self._metrics.record("stableflow", "GLOBAL", stab,
+                                     "defillama", min_gap_s=6 * 3600)
+        except Exception as e:  # noqa: BLE001
+            log.info("stable supply unavailable: %s", e)
 
     def _vrp_journal_task(self) -> None:
         """Record the daily VRP read for BTC/ETH so it forward-validates live."""
