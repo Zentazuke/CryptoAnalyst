@@ -715,6 +715,62 @@ def vrp_journal_feed(limit: int = Query(default=200, ge=1, le=500)) -> dict:
     return {"count": len(out), "by_verdict": by_verdict, "entries": out}
 
 
+@app.get("/metric-history/{symbol}")
+def metric_history(
+    symbol: str,
+    layer: str = Query(default=""),
+    metric: str = Query(default=""),
+    limit: int = Query(default=2000, ge=1, le=100_000),
+) -> dict:
+    """Read back the persisted sentiment/on-chain history (P1.1). Without
+    `metric`: the catalog of stored series. With `layer`+`metric`: the series
+    itself — the raw material the calibration harness scores."""
+    from analyst.storage.history import MetricHistory
+    try:
+        h = MetricHistory()
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=503, detail=f"history store unavailable: {exc}")
+    if not metric:
+        cat = [c for c in h.catalog(layer or None) if c["symbol"] == symbol]
+        return {"symbol": symbol, "series": cat}
+    if not layer:
+        raise HTTPException(status_code=422, detail="metric requires layer")
+    rows = h.series(layer, symbol, metric, limit=limit)
+    if not rows:
+        raise HTTPException(status_code=404, detail=f"no {layer}/{metric} history for {symbol}")
+    return {"symbol": symbol, "layer": layer, "metric": metric,
+            "count": len(rows), "series": rows}
+
+
+@app.get("/explain/{symbol}")
+def explain(
+    symbol: str,
+    timeframe: str = Query(default=DEFAULT_TIMEFRAME),
+) -> dict:
+    """Evidence panel: every signal firing on the latest bar with its measured
+    track record (hit rate, n, base rate, CI, stability), plus the current
+    regime and ITS calibration. The enforcement surface for 'no read without
+    receipts' — a signal that can't show evidence is labeled uncalibrated."""
+    from analyst.explain import explain_signals
+
+    rows = _load_candles(symbol, timeframe)
+    if not rows:
+        raise HTTPException(status_code=404, detail=f"no {timeframe} data for {symbol}")
+
+    def build() -> dict:
+        rep = explain_signals(rows, timeframe)
+        regime_results = classify_series(rows)
+        current = regime_results[-1].model_dump()
+        cal = calibrate(rows, regime_results)
+        current["calibration"] = cal["per_label"].get(current["label"])
+        current["calibration_horizon"] = cal["horizon"]
+        return {"regime": current, **rep}
+
+    payload = _cached(("explain", symbol, timeframe), 1800, build)
+    return {"symbol": symbol, "timeframe": timeframe,
+            "as_of": ms_to_iso(rows[-1]["ts"]), **payload}
+
+
 @app.get("/ensemble/{symbol}")
 def ensemble(
     symbol: str,

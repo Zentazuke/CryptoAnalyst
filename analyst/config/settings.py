@@ -77,6 +77,7 @@ SCHEDULER_INTERVALS: dict[str, int] = {
     "funding": int(os.environ.get("ANALYST_SCHED_FUNDING_S", 1800)),   # funding history
     "alert_journal": int(os.environ.get("ANALYST_SCHED_JOURNAL_S", 900)),  # record fired alerts
     "vrp_journal": int(os.environ.get("ANALYST_SCHED_VRP_S", 21600)),  # daily VRP signal (deduped)
+    "metric_history": int(os.environ.get("ANALYST_SCHED_METRICS_S", 1800)),  # sentiment/on-chain snapshots (P1.1)
 }
 
 # Map a spot symbol to its perpetual instrument on Crypto.com, used to source

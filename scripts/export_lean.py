@@ -61,12 +61,19 @@ def export_symbol(source, symbol: str, timeframe: str, count: int, writer, strid
         print(f"    classify_series failed ({str(exc)[:50]}); labels=unknown"); regs = None
     written = 0
     for i in range(250, n, stride):
-        lean, score, norm = "neutral", 0.0, 0.0
+        # P0 FIX (2026-07-04): in --no-ensemble mode the lean columns used to be
+        # written as "neutral"/0.0000 — indistinguishable from a real neutral call.
+        # A downstream consumer could feed 21,500 fake-neutral rows into a bot as if
+        # they were signal. Regime-only exports now leave those columns EMPTY.
+        lean_s = score_s = norm_s = ""
         if do_ensemble:  # the slow part: causal walk-forward weights, re-learned each bar
+            lean_s, score_s, norm_s = "neutral", "0.0000", "0.0000"
             try:
                 read = ensemble_read(rows[: i + 1], timeframe)
                 if read is not None:
-                    lean, score, norm = read["lean"], read["score"], read["normalized"]
+                    lean_s = read["lean"]
+                    score_s = f"{read['score']:.4f}"
+                    norm_s = f"{read['normalized']:.4f}"
             except Exception:  # noqa: BLE001 — never abort the whole export on one bar
                 pass
         if regs is not None and i < len(regs):
@@ -74,7 +81,7 @@ def export_symbol(source, symbol: str, timeframe: str, count: int, writer, strid
         else:
             label, conf = "unknown", 0.0
         writer.writerow([_day(rows[i]["ts"]), int(rows[i]["ts"]), symbol, timeframe,
-                         f"{rows[i]['close']:.6f}", lean, f"{score:.4f}", f"{norm:.4f}",
+                         f"{rows[i]['close']:.6f}", lean_s, score_s, norm_s,
                          label, conf])
         written += 1
         if written % 500 == 0:
@@ -90,16 +97,22 @@ def main() -> int:
     ap.add_argument("--stride", type=int, default=1, help="emit every Nth bar (speed knob)")
     ap.add_argument("--no-ensemble", action="store_true",
                     help="skip the slow ensemble lean; export regime labels only (fast — use for 4h)")
-    ap.add_argument("--out", default="analyst_lean.csv")
+    ap.add_argument("--out", default="", help="output CSV (default: analyst_lean.csv, or "
+                    "analyst_regime_<tf>.csv in --no-ensemble mode so the name says what it is)")
     args = ap.parse_args()
     symbols = [s.strip() for s in args.symbols.split(",") if s.strip()]
+    # P0 FIX (2026-07-04): a regime-only export must not be named like a lean export.
+    out_path = args.out or ("analyst_lean.csv" if not args.no_ensemble
+                            else f"analyst_regime_{args.timeframe.lower()}.csv")
 
     source = make_source()
     print(f"=== EXPORT analyst lean — {symbols} tf={args.timeframe} ~{args.days} bars "
           f"{'(regime labels only)' if args.no_ensemble else '(lean + regime)'} ===")
+    if args.no_ensemble:
+        print("    NOTE: regime-only export — lean/score/normalized columns will be EMPTY.")
     total = 0
     try:
-        with open(args.out, "w", newline="") as f:
+        with open(out_path, "w", newline="") as f:
             w = csv.writer(f)
             w.writerow(["date", "ts", "symbol", "timeframe", "close", "lean", "score",
                         "normalized", "regime", "confidence"])
@@ -109,7 +122,7 @@ def main() -> int:
     finally:
         if hasattr(source, "close"):
             source.close()
-    print(f"\nwrote {args.out} ({total} rows). Copy it into the Trading Bot's data_cache/ and run:")
+    print(f"\nwrote {out_path} ({total} rows). Copy it into the Trading Bot's data_cache/ and run:")
     print("  python intraday_tsm_analyst.py --days 1825 --gate-symbol BTC_USDT")
     return 0
 

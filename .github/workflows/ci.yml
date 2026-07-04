@@ -1,0 +1,64 @@
+# CI — every push/PR: backend tests on a CLEAN Linux (catches "works only in my
+# Windows .venv" failures), frontend typecheck+build (catches the platform-locked
+# node_modules class of failure), and an API import smoke test. (P4.1, 2026-07-04)
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install (fresh Linux env — no .venv baggage)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install pytest
+      - name: Tests
+        run: python -m pytest -q
+      - name: API smoke (app imports, routes registered)
+        run: |
+          python - <<'EOF'
+          from analyst.api.app import app
+          routes = {r.path for r in app.routes}
+          required = {"/health"}
+          missing = required - routes
+          assert not missing, f"missing routes: {missing}"
+          print(f"app OK — {len(routes)} routes, /health present")
+          EOF
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install (clean — never a copied node_modules)
+        run: npm ci
+      - name: Typecheck + build
+        run: npm run build
+
+  no-secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse committed env/data files
+        run: |
+          bad=$(git ls-files | grep -E '(^|/)\.env$|\.duckdb$|\.duckdb\.wal$' || true)
+          if [ -n "$bad" ]; then
+            echo "FORBIDDEN files tracked in git:"; echo "$bad"; exit 1
+          fi
+          echo "clean — no env/data files tracked"

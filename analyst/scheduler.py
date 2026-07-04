@@ -58,6 +58,7 @@ class Scheduler:
         self._source = None
         self._journal: AlertJournal | None = None
         self._vrp_journal = None
+        self._metrics = None
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self.tasks = [
@@ -66,6 +67,7 @@ class Scheduler:
             Task("funding", iv["funding"], self._funding),
             Task("alert_journal", iv["alert_journal"], self._alert_journal),
             Task("vrp_journal", iv.get("vrp_journal", 21600), self._vrp_journal_task),
+            Task("metric_history", iv.get("metric_history", 1800), self._metric_history),
         ]
 
     # ---- lifecycle --------------------------------------------------------
@@ -159,6 +161,33 @@ class Scheduler:
         alerts = detect_alerts(rows)
         if alerts:
             self._journal.record(alerts, tf)
+
+    def _metric_history(self) -> None:
+        """P1.1: persist sentiment + on-chain snapshots so those layers accrue
+        the history calibration needs. Engine offline / no coverage is normal —
+        skip quietly and try again next cycle."""
+        from analyst.ingestion.sentiment import SentimentClient
+        from analyst.onchain import onchain_snapshot
+        from analyst.storage.history import MetricHistory, flatten_numeric
+        if self._metrics is None:
+            self._metrics = MetricHistory()
+        with SentimentClient() as sc:
+            for sym in self.symbols:
+                try:
+                    bundle = sc.bundle(sym)
+                    if bundle:
+                        self._metrics.record("sentiment", sym, flatten_numeric(bundle),
+                                             "sentiment-engine", min_gap_s=900)
+                except Exception as e:
+                    log.info("sentiment history %s unavailable: %s", sym, e)
+        for sym in self.symbols:
+            try:
+                snap = onchain_snapshot(sym)
+                if snap:
+                    self._metrics.record("onchain", sym, flatten_numeric(snap),
+                                         "coinmetrics", min_gap_s=6 * 3600)
+            except Exception as e:
+                log.info("onchain history %s unavailable: %s", sym, e)
 
     def _vrp_journal_task(self) -> None:
         """Record the daily VRP read for BTC/ETH so it forward-validates live."""
