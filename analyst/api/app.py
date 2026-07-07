@@ -100,12 +100,32 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Crypto Analyst", version="0.1.0", lifespan=lifespan)
 
 # Local dev: allow the Vite frontend (any localhost port) to call the API.
+# POST/DELETE added for the watchlist endpoints (P3.1).
 app.add_middleware(
     CORSMiddleware,
     allow_origin_regex=r"http://(localhost|127\.0\.0\.1):\d+",
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST", "DELETE"],
     allow_headers=["*"],
 )
+
+
+# P4.3 (2026-07-04): optional bearer-token auth. Off by default (localhost use);
+# set ANALYST_API_TOKEN when the API is reachable beyond localhost (Tailscale,
+# Docker networks). /health stays open so probes/monitors keep working. The
+# token is read per-request so tests can toggle it without reimporting.
+import os as _os
+
+from fastapi.responses import JSONResponse
+
+
+@app.middleware("http")
+async def _bearer_auth(request, call_next):
+    token = _os.environ.get("ANALYST_API_TOKEN", "")
+    if token and request.url.path != "/health" and request.method != "OPTIONS":
+        if request.headers.get("Authorization") != f"Bearer {token}":
+            return JSONResponse({"detail": "unauthorized — send Authorization: "
+                                           "Bearer <ANALYST_API_TOKEN>"}, status_code=401)
+    return await call_next(request)
 
 
 def store() -> Store:
@@ -713,6 +733,40 @@ def vrp_journal_feed(limit: int = Query(default=200, ge=1, le=500)) -> dict:
             by_verdict[v] = {"n": len(ms), "mean_pnl_volpts": round(sum(ms) / len(ms), 1),
                              "hit_rate": round(sum(1 for p in ms if p > 0) / len(ms), 2)}
     return {"count": len(out), "by_verdict": by_verdict, "entries": out}
+
+
+_watchlists = None
+
+
+def _wl():
+    global _watchlists
+    if _watchlists is None:
+        from analyst.storage.watchlists import Watchlists
+        _watchlists = Watchlists()
+    return _watchlists
+
+
+@app.get("/watchlists")
+def watchlists_all() -> dict:
+    """All named watchlists (P3.1)."""
+    return {"lists": _wl().lists()}
+
+
+@app.post("/watchlists/{name}")
+def watchlists_add(name: str, symbols: str = Query(default="")) -> dict:
+    """Add comma-separated symbols to a list (creates it if new)."""
+    syms = [s for s in symbols.split(",") if s.strip()]
+    if not syms:
+        raise HTTPException(status_code=422, detail="symbols query param required")
+    added = _wl().add(name, syms)
+    return {"name": name, "added": added, "symbols": _wl().get(name)}
+
+
+@app.delete("/watchlists/{name}")
+def watchlists_remove(name: str, symbol: str = Query(default="")) -> dict:
+    """Remove one symbol from a list, or the whole list when symbol is omitted."""
+    removed = _wl().remove(name, symbol or None)
+    return {"name": name, "removed": removed, "symbols": _wl().get(name)}
 
 
 @app.get("/metric-history/{symbol}")

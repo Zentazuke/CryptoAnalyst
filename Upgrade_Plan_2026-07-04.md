@@ -66,8 +66,12 @@ Rule: each addition = ingest → persist → calibrate → card → only then UI
 | P0 | days | keys rotated; release script refuses dirty zips; 4h file can't be misread | ✅ 2026-07-04 (keys: Ricardo) |
 | P1 | 1–2 wk | sentiment/on-chain persisted; SIGNAL_CARD covers them; /explain live | 🟡 P1.1 + P1.2 + P1.4 done 2026-07-04; P1.3 (UI gating) next |
 | P2 T1 | 2–4 wk | skew, liquidations/CVD, stablecoins persisted + carded (pass or graveyard) | 🟡 feeds shipped 2026-07-04 (`p2_feeds` task); carding waits on accrued history |
-| P3 | parallel | watchlists + explorer shipped; composite only over calibrated signals | — |
-| P4 | ongoing | CI green on Linux; docker-compose up works on a clean machine | 🟡 CI workflow written; first green run pending push |
+| P3 | parallel | watchlists + explorer shipped; composite only over calibrated signals | 🟡 watchlists backend done 2026-07-04; explorer UI + composite next |
+| P4 | ongoing | CI green on Linux; docker-compose up works on a clean machine | 🟡 CI green ✅; bearer-token auth done 2026-07-04; Docker next session |
+
+**Also done 2026-07-04 (second pass):** P4.3 optional bearer auth (`ANALYST_API_TOKEN` env; /health exempt; off by default — set it if the API ever binds beyond localhost) and P3.1 watchlists (own DuckDB store + GET/POST/DELETE `/watchlists` endpoints; CORS widened to POST/DELETE). Both tested; suite at 187 green, 32 routes.
+
+**NEXT SESSION (explicitly deferred, in order):** P1.3 evidence-panel + P3.2 metric-explorer frontend components (React work — `/explain` and `/metric-history` are ready and waiting); P4.2 Dockerfile/compose; P3 composite score + metric carding remain **data-gated** until ~4–6 weeks of scheduler history exists.
 
 **Done 2026-07-04** (all verified against the full test suite on clean Linux — 173 tests passing):
 - P0.2 `scripts/make_release.py` · P0.3 4h export fix · P0.4 `.env.example` · P4.1 CI workflow
