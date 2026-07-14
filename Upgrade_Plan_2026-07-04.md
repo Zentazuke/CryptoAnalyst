@@ -71,7 +71,9 @@ Rule: each addition = ingest → persist → calibrate → card → only then UI
 
 **Also done 2026-07-04 (second pass):** P4.3 optional bearer auth (`ANALYST_API_TOKEN` env; /health exempt; off by default — set it if the API ever binds beyond localhost) and P3.1 watchlists (own DuckDB store + GET/POST/DELETE `/watchlists` endpoints; CORS widened to POST/DELETE). Both tested; suite at 187 green, 32 routes.
 
-**NEXT SESSION (explicitly deferred, in order):** P1.3 evidence-panel + P3.2 metric-explorer frontend components (React work — `/explain` and `/metric-history` are ready and waiting); P4.2 Dockerfile/compose; P3 composite score + metric carding remain **data-gated** until ~4–6 weeks of scheduler history exists.
+**Done 2026-07-07:** P1.3 `EvidencePanel.tsx` (every fired signal with receipts — reliable rows prominent, significant-but-unstable dimmed, uncalibrated behind a "decoration" drawer) + P3.2 `MetricExplorer.tsx` (catalog + dependency-free SVG chart over every persisted series incl. GLOBAL stableflow, labeled UNCALIBRATED until carded) + api.ts fetchers, wired into App. Verified: clean `npm ci` + `tsc` + `vite build` green.
+
+**REMAINING:** P4.2 Dockerfile/compose (next build item); P3 composite score + metric carding **data-gated** until ~4–6 weeks of scheduler history exists (~early-mid August 2026); P2 Tier-2 sources after Tier-1 verdicts.
 
 **Done 2026-07-04** (all verified against the full test suite on clean Linux — 173 tests passing):
 - P0.2 `scripts/make_release.py` · P0.3 4h export fix · P0.4 `.env.example` · P4.1 CI workflow

@@ -18,6 +18,8 @@ import { MarketScanCard } from "./components/MarketScanCard";
 import { AlertsCard } from "./components/AlertsCard";
 import { AlertJournalCard } from "./components/AlertJournalCard";
 import { OnChainCard } from "./components/OnChainCard";
+import { EvidencePanel } from "./components/EvidencePanel";
+import { MetricExplorer } from "./components/MetricExplorer";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
 const SYMBOLS = ["BTC_USDT", "ETH_USDT", "ROBO_USDC"];
@@ -239,7 +241,12 @@ export default function App() {
 
       {/* ── Then we break it apart: the evidence behind the read ── */}
       {data && (
-        <Section title="Evidence" subtitle="regime · microstructure · on-chain · sentiment">
+        <Section title="Evidence" subtitle="fired signals with receipts · regime · microstructure · on-chain · sentiment">
+          {/* P1.3: every firing signal with its measured track record — reliable
+              rows prominent, unproven ones behind a drawer. */}
+          <ErrorBoundary name="Signal evidence">
+            <EvidencePanel symbol={symbol} timeframe={timeframe} />
+          </ErrorBoundary>
           <div className="cards-row">
             <ErrorBoundary name="Regime card">
               <RegimeCard regime={data.regime_current} timeframe={timeframe} />
@@ -268,6 +275,13 @@ export default function App() {
           </ErrorBoundary>
         </Section>
       )}
+
+      {/* P3.2: browse everything the metric-history store has recorded. */}
+      <Section title="Metric explorer" subtitle="persisted options · derivatives · stableflow · sentiment · on-chain series">
+        <ErrorBoundary name="Metric explorer">
+          <MetricExplorer symbol={symbol} />
+        </ErrorBoundary>
+      </Section>
 
       <Section title="Market scan & alerts" subtitle="breadth, live setups & fired-alert track record">
         <ErrorBoundary name="Market scan">

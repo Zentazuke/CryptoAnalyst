@@ -52,3 +52,38 @@ _Auto-generated 2026-06-29 17:50 UTC from the live engine calibrations. Every fi
 ---
 
 **Reading it:** `EDGE` = the 95% CI excludes the base rate (a statistically real, if often small, edge). `no edge` = within noise. `insufficient n` = too few samples to judge. The honest headline of the project holds: single short-horizon signals sit near the predictability floor; measured value concentrates in trend/confluence on higher timeframes.
+
+---
+
+## Signal compatibility profile — regime classifier (added 2026-07-14)
+
+Calibration numbers alone don't say WHO may consume a signal. Learned the hard
+way (see STRATEGY_GRAVEYARD.md, grid entry): the regime signal's edge survives
+only at turnover compatible with its horizon.
+
+```
+Signal horizon:     daily to multi-week
+Information lag:    one causal daily shift (label for day D usable from D+1)
+Expected decay:     slow
+Suitable turnover:  low (~flips per month, not per day)
+
+Suitable consumers: position sleeves · allocation shifts · risk scaling ·
+                    slow rebalancing · exposure reduction / rotation
+Poor consumers:     intraday grids · high-frequency inventory resets ·
+                    rapid regime switching · fee-sensitive execution
+```
+
+Evidence: identical labels power the sleeve shadow test (low turnover —
+beating buy-and-hold live) and failed to rescue the grid (high turnover —
+every gate mode negative). Any NEW consumer of this signal must state its
+expected turnover and show the edge survives its own friction before going
+live. Every future calibrated signal added to this card should ship with the
+same profile block.
+
+**Confidence semantics (learned 2026-07-14, sleeve consumption study):** the
+regime signal's confidence field carries information about HOW MUCH risk to
+carry, not permission to trade MORE OFTEN. Used as a slow exposure scaler
+(TR-A) it improved risk-adjusted results (basket Sharpe 1.17 vs 1.06, DD 19%
+vs 23%); used to drive higher transaction frequency (vol-targeting variants,
+thousands of micro-rebalances) the same information was consumed by friction.
+Consumers may scale WITH confidence; they may not churn BECAUSE of it.

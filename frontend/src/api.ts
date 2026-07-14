@@ -132,4 +132,94 @@ export async function fetchDataHealth(): Promise<DataHealth | null> {
   }
 }
 
+// ---- P1.3 evidence panel (/explain) ---------------------------------------
+
+export interface FiredSignal {
+  signal: string;
+  direction: "bullish" | "bearish";
+  verdict: string;
+  reliable: boolean;
+  significant?: boolean;
+  stable?: boolean;
+  n?: number;
+  accuracy?: number;
+  base?: number;
+  lift?: number;
+  ci_low?: number;
+  ci_high?: number;
+  h1_acc?: number | null;
+  h2_acc?: number | null;
+  orientation?: string;
+}
+
+export interface ExplainResponse {
+  symbol: string;
+  timeframe: string;
+  as_of: string;
+  horizon: number;
+  regime: {
+    label: string;
+    confidence: number;
+    calibration?: { hit_rate?: number; base_rate?: number; lift?: number;
+                    significant?: boolean; verdict?: string; count?: number } | null;
+    calibration_horizon?: number;
+  };
+  fired: FiredSignal[];
+  summary: {
+    fired_total: number;
+    reliable_bullish: number;
+    reliable_bearish: number;
+    read: string;
+    note: string;
+  };
+}
+
+export async function fetchExplain(symbol: string, timeframe: string): Promise<ExplainResponse | null> {
+  try {
+    return await getJSON<ExplainResponse>(
+      `/explain/${encodeURIComponent(symbol)}?timeframe=${encodeURIComponent(timeframe)}`,
+    );
+  } catch {
+    return null;
+  }
+}
+
+// ---- P3.2 metric explorer (/metric-history) --------------------------------
+
+export interface MetricCatalogEntry {
+  layer: string;
+  symbol: string;
+  metric: string;
+  n: number;
+  first_ts: number;
+  last_ts: number;
+}
+
+export interface MetricSeriesPoint { ts: number; value: number }
+
+export async function fetchMetricCatalog(symbol: string): Promise<MetricCatalogEntry[]> {
+  try {
+    const d = await getJSON<{ series: MetricCatalogEntry[] }>(
+      `/metric-history/${encodeURIComponent(symbol)}`,
+    );
+    return d.series ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchMetricSeries(
+  layer: string, symbol: string, metric: string, limit = 2000,
+): Promise<MetricSeriesPoint[]> {
+  try {
+    const d = await getJSON<{ series: MetricSeriesPoint[] }>(
+      `/metric-history/${encodeURIComponent(symbol)}?layer=${encodeURIComponent(layer)}` +
+      `&metric=${encodeURIComponent(metric)}&limit=${limit}`,
+    );
+    return d.series ?? [];
+  } catch {
+    return [];
+  }
+}
+
 export const API_BASE = BASE;

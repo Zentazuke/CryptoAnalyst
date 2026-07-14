@@ -34,3 +34,33 @@ produced.** The analyst's job is to keep producing that refusal — see
 `VRP_MODEL_CARD.md` (the premium is real but un-harvestable retail) and
 `SIGNAL_CARD.md` (which signals carry measured, stable directional edge — modest,
 ~1.2 lift, costs-bound).
+
+---
+
+## Grid trading — thesis rejected (2026-07-14, final)
+
+The failure was NOT caused by regime-classifier quality. The ungated grid
+exhibited **negative net expectancy inside analyst-identified range regimes**
+(BTC 4.5yr: range −29.5% / trend +63.3% — it lost in the ranges it exists to
+harvest and earned only by riding inventory through trends: disguised beta
+paying 9–21% of capital in fees, losing to buy-and-hold). Daily causal regime
+labels carry useful directional information but are structurally incompatible
+with high-turnover intraday inventory management: every gate mode (exit /
+freeze / hedge) made results worse through fee drag and lag-realized adverse
+inventory across 125–159 regime transitions. Tested with BOTH regime sources
+(internal ER and the analyst export). A perfect gate cannot rescue an activity
+whose EV is negative in its ideal condition.
+
+**Standing rule:** no further grid development without a pre-registered
+harvestability hypothesis that beats, out of sample and after fees/slippage/
+selection penalties, ALL of: (1) the ungated grid, (2) buy-and-hold,
+(3) passive stablecoin carry, (4) the live sleeve system.
+
+**The lesson bigger than grids:** a signal is not independent of its consumer.
+Accuracy/calibration must be paired with a compatibility profile (horizon,
+lag, decay, suitable turnover). The regime signal answers "what directional
+environment over the coming days?" — the grid silently changed the question
+to "will the next hours oscillate enough to beat two-sided costs?" Those are
+different statistical targets. Same brain, wrong body: the sleeves consume
+the identical signal at ~2 near-free flips/month and are currently beating
+buy-and-hold live.
