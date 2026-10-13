@@ -87,3 +87,13 @@ carry, not permission to trade MORE OFTEN. Used as a slow exposure scaler
 vs 23%); used to drive higher transaction frequency (vol-targeting variants,
 thousands of micro-rebalances) the same information was consumed by friction.
 Consumers may scale WITH confidence; they may not churn BECAUSE of it.
+
+**Range-confidence semantics (decoded 2026-07-20):** `range` confidence is a
+*cleanliness* score, not a probability — computed from how far ADX sits BELOW
+the range threshold (classifier.py, final branch). conf 0.0 = CONTESTED range
+(ADX at/above threshold but no agreed direction — violent directionless chop);
+high conf = quiet, clean range. Persistent range/0.0 (e.g. BTC/ETH/AVAX,
+July 2026) is bear-consolidation being read correctly, not a stuck feed.
+Untested hypothesis, parked (NOT pre-registered): contested ranges may be
+worse hosts for long exposure than clean ranges — if ever examined, it goes
+through a fresh pre-registration, not a tweak to a running sleeve.
